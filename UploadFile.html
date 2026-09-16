@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <style>
+    #loading {
+      font-size: 16px;
+      text-align: center;
+      color: blue; /* Set font color to blue */
+    }
+  </style>
+</head>
+
+<body>
+  <input type="file" name="upload" id="files" />
+  <input type="button" id="uploadButton" value="Upload" onclick="getFiles()" class="action">
+  <br><br>
+  <div id="loading"></div>
+
+  <script>
+    function getFiles() {
+      document.getElementById("uploadButton").disabled = true;
+      document.getElementById("loading").innerHTML = "Sedang Mengupload...";
+
+      const f = document.getElementById('files');
+      var totalFiles = [...f.files].length;
+      var uploadedFiles = 0;
+
+      [...f.files].forEach((file, i) => {
+        // Checking file size
+        if (file.size > 3 * 1024 * 1024) { // 2MB
+          document.getElementById("loading").innerHTML = "Ukuran file " + file.name + " melebihi 2.5MB.";
+          enableUploadButton();
+          return;
+        }
+
+        const fr = new FileReader();
+        fr.onload = (e) => {
+          const data = e.target.result.split(",");
+          const obj = {
+            fileName: f.files[i].name,
+            mimeType: data[0].match(/:(\w.+);/)[1],
+            data: data[1]
+          };
+
+          // Check MIME type
+          if (obj.mimeType !== "image/jpeg" && obj.mimeType !== "application/pdf") {
+            document.getElementById("loading").innerHTML = "Format file " + file.name + " tidak valid. Hanya file JPG atau PDF yang diterima.";
+            enableUploadButton();
+            return;
+          }
+
+          google.script.run.withSuccessHandler((id) => {
+            uploadedFiles++;
+            if (uploadedFiles >= totalFiles) {
+              document.getElementById("loading").innerHTML = "Upload Selesai...!";
+              google.script.host.close();
+            }
+          }).saveFile(obj);
+        };
+        fr.readAsDataURL(file);
+      });
+    }
+
+    function enableUploadButton() {
+      document.getElementById("uploadButton").disabled = false;
+    }
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMPEWA - Dashboard Control MCX</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root { --primary: #2563eb; --bg-color: #f8fafc; --text-main: #0f172a; --text-muted: #64748b; --border-color: #e2e8f0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+    .sidebar { width: 260px; background: #0f172a; color: white; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+    .brand { font-size: 18px; font-weight: bold; color: #38bdf8; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
+    .menu-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
+    .menu-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; font-weight: 500; color: #94a3b8; margin-bottom: 5px; transition: all 0.2s; }
+    .menu-item.active, .menu-item:hover { background-color: #1e293b; color: white; }
+    .main-content { flex-grow: 1; overflow-y: auto; padding: 30px; }
+    .card { background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
+    th { background-color: #f1f5f9; color: var(--text-main); }
+    .btn-action { background: var(--primary); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: white; padding: 25px; border-radius: 16px; width: 620px; max-height: 85vh; overflow-y: auto; }
+    .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; font-size: 13px; }
+    input { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; font-size: 13px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <div>
+      <div class="brand">🔍 <span>SIMPEWA MCX</span></div>
+      <ul class="menu-list">
+        <li class="menu-item active">📥 Antrean Verifikasi MCX</li>
+      </ul>
+    </div>
+    <div style="margin-top: auto; margin-bottom: 15px; padding-top: 15px; border-top: 1px solid #334155;">
+      <p style="font-size: 11px; color: #94a3b8; margin: 0;">Login Control MCX:</p>
+      <p style="font-size: 12px; font-weight: bold; color: white; margin: 3px 0;"><?= emailUser ?></p>
+    </div>
+    <div class="menu-item" style="color: #f87171;" onclick="keluarSistem()">🚪 Keluar</div>
+  </div>
+
+  <div class="main-content">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <div>
+        <h2 style="margin: 0;">Master Control & Adjustment Hub</h2>
+        <p style="margin: 5px 0 0 0; color: var(--text-muted); font-size: 14px;">Verifikasi dan penyesuaian nominal sewa sebelum masuk ke Sekretaris.</p>
+      </div>
+      <button class="btn-action" onclick="loadDataMCX()">🔄 Refresh Data</button>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>KODE ID</th>
+            <th>Lokasi Baru / NF</th>
+            <th>Jenis Sewa</th>
+            <th>Nama Pemilik</th>
+            <th>Harga Ajuan Pokok</th>
+            <th>Aksi MCX</th>
+          </tr>
+        </thead>
+        <tbody id="tabelMCX">
+          <tr><td colspan="6" style="text-align: center;">Memuat antrean verifikasi MCX... ⏳</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL REVIEW MCX -->
+  <div class="modal-overlay" id="modalMCX">
+    <div class="modal-content">
+      <h3 style="margin-top: 0; color: var(--primary);">Review & Koreksi Harga MCX</h3>
+      <p id="mKodeId" style="font-weight: bold; color: var(--text-muted); margin-top: -10px;"></p>
+      
+      <div class="modal-grid">
+        <div><b>Lokasi:</b> <span id="mLokasi"></span></div>
+        <div><b>Jenis Transaksi:</b> <span id="mStatusSewa"></span></div>
+        <div id="boxLokasiLama" style="display:none; grid-column: span 2;"><b>Lokasi Lama (Relokasi):</b> <span id="mLokasiLama" style="color:#d97706; font-weight:bold;"></span></div>
+        <div><b>Nama Pemilik:</b> <span id="mNamaPemilik"></span></div>
+        <div><b>Masa Sewa:</b> <span id="mMasaSewa"></span> Tahun</div>
+        <div><b>Harga Ajuan Negosiator:</b> <br><span id="mHargaAjuan" style="font-weight:bold; color:#059669;"></span></div>
+        <div><b>Nilai Gross Up Ajuan:</b> <br><span id="mHargaGross" style="font-weight:bold; color:#2563eb;"></span></div>
+      </div>
+
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+        <label style="font-weight: bold; font-size: 13px; color: #1e40af;">Koreksi Nominal Harga Pokok Sewa (Rp):</label>
+        <input type="text" id="inputKoreksiHarga" placeholder="Masukkan harga hasil nego MCX">
+        <span style="font-size: 11px; color: #60a5fa; display: block; margin-top: 4px;">*Biarkan seperti semula jika tidak ada penyesuaian harga.</span>
+      </div>
+
+      <div style="margin-bottom: 15px;">
+        <label style="font-weight: bold; font-size: 12px;">Catatan Analisis MCX:</label>
+        <input type="text" id="inputCatatanMCX" placeholder="Contoh: Harga sudah sesuai benchmark / Ada nego ulang Rp 5jt">
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+        <button onclick="tutupModal()" style="background: #cbd5e1; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">Batal</button>
+        <button onclick="prosesMCX('REVISED')" style="background: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">⚠️ Minta Revisi Negosiator</button>
+        <button onclick="prosesMCX('APPROVED')" style="background: #059669; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">✔ ACC & Teruskan ke Sekretaris</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var globalDataMCX = [];
+    var selectedItem = null;
+
+    window.onload = function() { loadDataMCX(); };
+
+    function loadDataMCX() {
+      google.script.run.withSuccessHandler(function(list) {
+        globalDataMCX = list;
+        var tbody = document.getElementById('tabelMCX');
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Antrean Bersih! Belum ada pengajuan baru dari Negosiator.</td></tr>';
+          return;
+        }
+        var html = '';
+        list.forEach(function(item, idx) {
+          html += '<tr>' +
+            '<td><b>' + item.kodeId + '</b></td>' +
+            '<td>' + item.lokasi + '</td>' +
+            '<td>' + item.statusSewa + '</td>' +
+            '<td>' + (item.namaPemilik || "-") + '</td>' +
+            '<td><b style="color:#059669;">Rp ' + Math.round(item.hargaPokok || 0).toLocaleString('id-ID') + '</b></td>' +
+            '<td><button class="btn-action" onclick="bukaModal(' + idx + ')">🔍 Review & Adjust</button></td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+      }).getPengajuanMCX();
+    }
+
+    function bukaModal(idx) {
+      selectedItem = globalDataMCX[idx];
+      document.getElementById('mKodeId').innerText = "KODE ID: " + selectedItem.kodeId;
+      document.getElementById('mLokasi').innerText = selectedItem.lokasi;
+      document.getElementById('mStatusSewa').innerText = selectedItem.statusSewa;
+      document.getElementById('mNamaPemilik').innerText = selectedItem.namaPemilik || "-";
+      document.getElementById('mMasaSewa').innerText = selectedItem.masaSewa;
+      document.getElementById('mHargaAjuan').innerText = "Rp " + Math.round(selectedItem.hargaPokok || 0).toLocaleString('id-ID');
+      document.getElementById('mHargaGross').innerText = "Rp " + Math.round(selectedItem.nilaiGrossUp || 0).toLocaleString('id-ID');
+      document.getElementById('inputKoreksiHarga').value = Math.round(selectedItem.hargaPokok || 0).toLocaleString('id-ID');
+      document.getElementById('inputCatatanMCX').value = "";
+
+      if (selectedItem.statusSewa === "Relokasi") {
+        document.getElementById('boxLokasiLama').style.display = 'block';
+        document.getElementById('mLokasiLama').innerText = selectedItem.lokasiLama;
+      } else {
+        document.getElementById('boxLokasiLama').style.display = 'none';
+      }
+
+      document.getElementById('modalMCX').style.display = 'flex';
+    }
+
+    function tutupModal() { document.getElementById('modalMCX').style.display = 'none'; }
+
+    function prosesMCX(keputusan) {
+      var hrgFix = document.getElementById('inputKoreksiHarga').value;
+      var catatan = document.getElementById('inputCatatanMCX').value;
+
+      tutupModal();
+      Swal.fire({ title: 'Memproses Verifikasi MCX...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+      google.script.run
+        .withSuccessHandler(function(msg) {
+          Swal.fire('Berhasil', msg, 'success');
+          loadDataMCX();
+        })
+        .withFailureHandler(function(err) {
+          Swal.fire('Gagal', err.message, 'error');
+        })
+        .verifikasiDanAdjustMCX(selectedItem.kodeId, keputusan, hrgFix, catatan);
+    }
+
+    function keluarSistem() {
+      window.top.location.href = "<?= ScriptApp.getService().getUrl() ?>";
+    }
+  </script>
+</body>
+</html>

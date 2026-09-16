@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMPEWA - Dashboard Negosiator</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root { --primary: #2563eb; --bg-color: #f8f9fc; --text-main: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+    .sidebar { width: 260px; background: white; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+    .brand { font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
+    .menu-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
+    .menu-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; transition: all 0.2s; }
+    .menu-item.active, .menu-item:hover { background-color: #eff6ff; color: var(--primary); }
+    .main-content { flex-grow: 1; overflow-y: auto; padding: 30px; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+    .form-container { display: grid; grid-template-columns: 2.5fr 1fr; gap: 25px; }
+    .card { background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02); }
+    .card-title { font-size: 16px; font-weight: 600; color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 5px; }
+    input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; box-sizing: border-box; outline: none; transition: 0.2s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    input[readonly], input:disabled { background-color: #f1f5f9; font-weight: bold; color: var(--text-muted); cursor: not-allowed; }
+    .upload-area { border: 2px dashed #93c5fd; background-color: #f0f9ff; padding: 25px; border-radius: 12px; text-align: center; cursor: pointer; }
+    .file-info { display: flex; align-items: center; justify-content: space-between; background: white; padding: 10px 15px; border-radius: 8px; border: 1px solid #cbd5e1; margin-top: 10px; }
+    .autocomplete { position: relative; display: block; }
+    .autocomplete-items { position: absolute; border: 1px solid var(--border-color); z-index: 99; top: 100%; left: 0; right: 0; background: white; border-radius: 8px; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); }
+    .autocomplete-items div { padding: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+    .autocomplete-items div:hover { background-color: #eff6ff; color: var(--primary); font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
+    th { background-color: #f8fafc; color: var(--text-main); }
+    .req { color: #ef4444; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <div>
+      <div class="brand">🏢 <span>SIMPEWA</span></div>
+      <ul class="menu-list">
+        <li class="menu-item active" id="tabForm" onclick="switchTab('form')">📊 Form Pengajuan</li>
+        <li class="menu-item" id="tabRiwayat" onclick="switchTab('riwayat')">📁 Riwayat Saya</li>
+      </ul>
+    </div>
+    <div style="margin-top: auto; margin-bottom: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+      <p style="font-size: 11px; color: var(--text-muted); margin: 0;">Login sebagai:</p>
+      <p style="font-size: 12px; font-weight: bold; color: var(--text-main); margin: 3px 0; word-wrap: break-word;"><?= emailUser ?></p>
+    </div>
+    <div class="menu-item" style="color: #ef4444;" onclick="keluarSistem()">🚪 Keluar</div>
+  </div>
+
+  <div class="main-content">
+    <div id="pageForm">
+      <div class="header-top">
+        <div>
+          <h2 style="margin: 0;">Form Pengajuan Sewa Baru</h2>
+          <p style="margin: 5px 0 0 0; color: var(--text-muted); font-size: 13px;">Isi data pengajuan sewa secara lengkap.</p>
+        </div>
+      </div>
+
+      <div class="form-container">
+        <div id="formPengajuan">
+
+          <!-- SEWA LAMA -->
+          <div class="card">
+            <div class="card-title">📍 Informasi Sewa Sebelumnya</div>
+            <div class="grid-2">
+              <div class="autocomplete">
+                <label>Lokasi NF <span class="req">*</span></label>
+                <input id="inputLokasi" type="text" placeholder="Ketik lokasi NF...">
+              </div>
+              <div>
+                <label>Jenis Transaksi / Status Sewa <span class="req">*</span></label>
+                <select id="statusSewa" onchange="toggleRelokasiUI(); cekStatusSewa();">
+                   <option value="Perpanjang">Perpanjang</option>
+                   <option value="Kontrak Baru">Kontrak Baru</option>
+                   <option value="Relokasi">Relokasi</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div id="groupLokasiLama" class="autocomplete" style="display: none;">
+                <label style="color:#d97706;">Lokasi Lama Asal Relokasi <span class="req">*</span></label>
+                <input type="text" id="inputLokasiLama" placeholder="Ketik lokasi lama asal relokasi...">
+              </div>
+              <div>
+                <label>Nama Lengkap Pemilik Lokasi <span class="req">*</span></label>
+                <input type="text" id="inputNamaPemilik" placeholder="Nama pemilik sesuai KTP / Sertifikat">
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div><label>Harga Sewa Lama</label><input type="text" id="hargaLama" placeholder="0" class="rupiah"></div>
+              <div><label>Masa Sewa Lama (Tahun)</label><input type="number" id="masaSewaLama" placeholder="1" min="1" oninput="validasiMasaSewa(this)"></div>
+            </div>
+            <div class="grid-2">
+              <div><label>Tanggal Habis Kontrak Lama</label><input type="date" id="tanggalHabisLama"></div>
+              <div><label>Deposit Lama</label><input type="text" id="depositLama" placeholder="0" class="rupiah"></div>
+            </div>
+          </div>
+
+          <!-- SEWA BARU -->
+          <div class="card">
+            <div class="card-title">📈 Perjanjian Sewa Baru</div>
+            <div class="grid-2">
+              <div><label>Harga Sewa Baru (Pokok) <span class="req">*</span></label><input type="text" id="hargaBaru" placeholder="0" class="rupiah" oninput="hitungPajak()"></div>
+              <div>
+                <label>Bersedia Dipotong Pajak?</label>
+                <select id="pajak" onchange="hitungPajak()">
+                  <option value="Ya, dipotong">Ya, dipotong (10%)</option>
+                  <option value="Tidak (Gross Up)">Tidak dipotong (Gross Up)</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div>
+                <label>Pihak Pembayar Pajak PBB</label>
+                <select id="pembayarPBB">
+                  <option value="Pemilik">Pemilik</option>
+                  <option value="NurulFikri">NurulFikri</option>
+                  <option value="1/2 NF 1/2 Pemilik">1/2 NF 1/2 Pemilik</option>
+                </select>
+              </div>
+              <div><label>Nilai Sewa Final (Gross Up)</label><input type="text" id="nilaiFinal" readonly placeholder="Rp 0" style="color: #059669;"></div>
+            </div>
+            <div class="grid-3">
+              <div><label>Tanggal Mulai Baru <span class="req">*</span></label><input type="date" id="tglMulaiBaru" onchange="hitungTglAkhir()"></div>
+              <div><label>Masa Sewa (Tahun)</label><input type="number" id="masaSewaBaru" value="1" min="1" oninput="validasiMasaSewa(this); hitungTglAkhir();"></div>
+              <div><label>Tanggal Habis Kontrak Baru</label><input type="date" id="tglAkhirBaru" readonly></div>
+            </div>
+          </div>
+
+          <!-- SKEMA PEMBAYARAN -->
+          <div class="card">
+            <div class="card-title">💳 Skema Pembayaran & Deposit Baru</div>
+            <div style="margin-bottom: 15px;">
+              <label>Metode Pembayaran</label>
+              <select id="metodeBayar" onchange="toggleCicilanUI()">
+                <option value="Lunas">Sekali Lunas (Satu Kali Bayar)</option>
+                <option value="Cicilan">Dicicil (Bertahap)</option>
+              </select>
+            </div>
+
+            <div class="grid-2">
+              <div><label id="lblCicilan1">Tanggal Pelunasan</label><input type="date" id="tglCicilan1"></div>
+              <div><label id="lblJmlCicilan1">Jumlah Pembayaran (Rp)</label><input type="text" id="jmlCicilan1" placeholder="0" class="rupiah"></div>
+            </div>
+
+            <div id="boxCicilanLanjutan" style="display: none;">
+              <div class="grid-2">
+                <div><label>Tanggal Cicilan 2</label><input type="date" id="tglCicilan2"></div>
+                <div><label>Jumlah Cicilan 2 (Rp)</label><input type="text" id="jmlCicilan2" placeholder="0" class="rupiah"></div>
+              </div>
+              <div class="grid-2">
+                <div><label>Tanggal Cicilan 3</label><input type="date" id="tglCicilan3"></div>
+                <div><label>Jumlah Cicilan 3 (Rp)</label><input type="text" id="jmlCicilan3" placeholder="0" class="rupiah"></div>
+              </div>
+            </div>
+
+            <div style="margin-top: 15px;">
+              <label>Jumlah Pembayaran Deposit Baru (Jika Ada)</label>
+              <input type="text" id="depositBaru" placeholder="0" class="rupiah">
+            </div>
+          </div>
+
+          <!-- REKENING BANK PEMILIK -->
+          <div style="background: #f0f9ff; border: 1px dashed #0284c7; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <h4 style="margin: 0 0 10px 0; color: #0284c7;">🏦 Informasi Rekening Bank Pemilik (Transfer) <span class="req">*</span></h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div>
+                <label>Nama Bank <span class="req">*</span></label>
+                <select id="bankNama">
+                  <option value="">-- Pilih Bank --</option>
+                  <option value="BCA">BCA</option>
+                  <option value="Mandiri">Bank Mandiri</option>
+                  <option value="BRI">BRI</option>
+                  <option value="BNI">BNI</option>
+                  <option value="CIMB Niaga">CIMB Niaga</option>
+                  <option value="Bank DKI">Bank DKI</option>
+                  <option value="Lainnya">Bank Lainnya</option>
+                </select>
+              </div>
+              <div>
+                <label>Nomor Rekening <span class="req">*</span></label>
+                <input type="text" id="bankNoRek" placeholder="Contoh: 1234567890" onkeyup="this.value=this.value.replace(/\D/g,'')">
+              </div>
+              <div style="grid-column: span 2;">
+                <label>Nama Pemilik Rekening (A.N. Sesuai Buku) <span class="req">*</span></label>
+                <input type="text" id="bankAn" placeholder="Contoh: BUDI SANTOSO">
+              </div>
+            </div>
+          </div>
+
+          <!-- DOKUMEN -->
+          <div class="card">
+            <div class="card-title">📂 Dokumen SPK</div>
+            <div class="upload-area" onclick="document.getElementById('uploadSPK').click()">
+              <span style="font-size: 30px;">📄</span>
+              <p style="margin: 5px 0; font-weight: bold; color: var(--primary);">Klik untuk Unggah Draft SPK (PDF/Word)</p>
+              <input type="file" id="uploadSPK" accept=".pdf,.doc,.docx" style="display: none;" onchange="handleFileSelect(this)">
+            </div>
+            <div id="filePreviewBox" style="display: none;">
+              <div class="file-info">
+                <span id="fileNameDisplay" style="font-weight: 600; font-size: 13px;"></span>
+                <button type="button" onclick="cancelUploadFile()" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">❌ Batal File</button>
+              </div>
+            </div>
+            <div style="margin-top: 15px;">
+              <label>Catatan Tambahan untuk Memo Direktur</label>
+              <textarea id="catatanMemo" placeholder="(opsional)"></textarea>
+            </div>
+          </div>
+
+          <!-- TOMBOL SIMPAN -->
+          <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+            <button type="button" onclick="kirimPengajuan('DRAFT')" style="background: #64748b; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">💾 Simpan Draft</button>
+            <button type="button" onclick="kirimPengajuan('FINAL')" style="background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">🚀 Ajukan Final ke MCX</button>
+          </div>
+        </div>
+
+        <div style="position: sticky; top: 30px;">
+          <div class="card">
+            <div class="card-title">📌 Status Form</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 2px;">Kode ID Transaksi</p>
+            <p id="nomorPengajuanDisplay" style="font-weight: 700; margin-top: 0; font-size: 16px; color: var(--primary);">OTOMATIS</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB RIWAYAT SAYA -->
+    <div id="pageRiwayat" style="display: none;">
+      <div class="header-top">
+        <h2>Riwayat Pengajuan Saya</h2>
+        <button type="button" onclick="loadRiwayat()" style="background: #0284c7; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">🔄 Refresh Data</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>KODE ID</th>
+              <th>Lokasi</th>
+              <th>Jenis Sewa</th>
+              <th>Harga Sewa</th>
+              <th>Status Progress</th>
+              <th>Catatan MCX / Sekr</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tabelRiwayat">
+            <tr><td colspan="7" style="text-align: center;">Memuat data... ⏳</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    var currentEditKodeId = "";
+    var existingSpkUrl = "";
+    var existingMemoUrl = "";
+
+    // SINKRONISASI GAS HISTORY UNTUK FIX CTRL+R PERMANEN
+    window.onload = function() {
+      if (typeof google !== 'undefined' && google.script && google.script.history) {
+        google.script.history.replace(null, { page: 'dashboard', role: '<?= currentRole ?>' }, 'page=dashboard&role=<?= currentRole ?>');
+      }
+      loadRiwayat();
+      cekStatusSewa();
+    };
+
+    function switchTab(tab) {
+      if(tab === 'form') {
+        document.getElementById('pageForm').style.display = 'block';
+        document.getElementById('pageRiwayat').style.display = 'none';
+        document.getElementById('tabForm').className = 'menu-item active';
+        document.getElementById('tabRiwayat').className = 'menu-item';
+      } else {
+        document.getElementById('pageForm').style.display = 'none';
+        document.getElementById('pageRiwayat').style.display = 'block';
+        document.getElementById('tabForm').className = 'menu-item';
+        document.getElementById('tabRiwayat').className = 'menu-item active';
+        loadRiwayat();
+      }
+    }
+
+    function toggleRelokasiUI() {
+      var st = document.getElementById('statusSewa').value;
+      var boxLama = document.getElementById('groupLokasiLama');
+      if (st === "Relokasi") {
+        boxLama.style.display = 'block';
+      } else {
+        boxLama.style.display = 'none';
+        if (document.getElementById('inputLokasiLama')) document.getElementById('inputLokasiLama').value = "";
+      }
+    }
+
+    function cekStatusSewa() {
+      var status = document.getElementById("statusSewa").value;
+      var fieldsLama = ["hargaLama", "masaSewaLama", "tanggalHabisLama", "depositLama"];
+      fieldsLama.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+          if (status === "Kontrak Baru") {
+            el.value = "";
+            el.disabled = true;
+          } else { 
+            el.disabled = false;
+          }
+        }
+      });
+    }
+
+    document.querySelectorAll('.rupiah').forEach(function(input) {
+      input.addEventListener('keyup', function() {
+        var val = this.value.replace(/\D/g, '');
+        this.value = val ? val.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
+        hitungPajak();
+      });
+    });
+
+    function validasiMasaSewa(input) {
+      if (input.value !== "" && parseInt(input.value) <= 0) { input.value = "1"; }
+    }
+
+    function toggleCicilanUI() {
+      var status = document.getElementById('metodeBayar').value;
+      var box = document.getElementById('boxCicilanLanjutan');
+      if(status === 'Lunas') {
+        box.style.display = 'none';
+        document.getElementById('jmlCicilan2').value = "";
+        document.getElementById('jmlCicilan3').value = "";
+      } else {
+        box.style.display = 'block';
+      }
+    }
+
+    function handleFileSelect(input) {
+      if (input.files && input.files[0]) {
+        document.getElementById('fileNameDisplay').innerText = "📄 " + input.files[0].name;
+        document.getElementById('filePreviewBox').style.display = 'block';
+      }
+    }
+
+    function cancelUploadFile() {
+      document.getElementById('uploadSPK').value = "";
+      document.getElementById('filePreviewBox').style.display = 'none';
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(data) {
+        if (data && Array.isArray(data)) {
+          setupAutocomplete(document.getElementById("inputLokasi"), data);
+          setupAutocomplete(document.getElementById("inputLokasiLama"), data);
+        }
+      }).getDaftarLokasi();
+    }
+
+    function setupAutocomplete(inp, arr) {
+      if (!inp || !arr) return;
+      inp.addEventListener("input", function() {
+        var a, b, val = this.value; closeAllLists(); if (!val) return false;
+        a = document.createElement("DIV"); a.setAttribute("class", "autocomplete-items"); this.parentNode.appendChild(a);
+        var count = 0;
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i].toUpperCase().includes(val.toUpperCase()) && count < 8) {
+            b = document.createElement("DIV"); b.innerHTML = arr[i] + "<input type='hidden' value='" + arr[i] + "'>";
+            b.addEventListener("click", function() { inp.value = this.getElementsByTagName("input")[0].value; closeAllLists(); });
+            a.appendChild(b); count++;
+          }
+        }
+      });
+      function closeAllLists(elmnt) {
+        var x = document.getElementsByClassName("autocomplete-items");
+        for (var i = 0; i < x.length; i++) { if (elmnt != x[i] && elmnt != inp) { x[i].parentNode.removeChild(x[i]); } }
+      }
+      document.addEventListener("click", function (e) { closeAllLists(e.target); });
+    }
+
+    function hitungTglAkhir() {
+      var tglMulai = document.getElementById("tglMulaiBaru").value;
+      var masa = parseInt(document.getElementById("masaSewaBaru").value) || 0;
+      if(tglMulai && masa > 0) {
+        var date = new Date(tglMulai);
+        date.setFullYear(date.getFullYear() + masa);
+        date.setDate(date.getDate() - 1); 
+        document.getElementById("tglAkhirBaru").value = date.toISOString().split('T')[0];
+      }
+    }
+
+    function hitungPajak() {
+      var rawBaru = document.getElementById('hargaBaru').value.replace(/\./g, '');
+      var baru = parseFloat(rawBaru) || 0;
+      var statusPajak = document.getElementById('pajak').value;
+      var final = statusPajak.includes("Ya") ? baru : (baru / 0.9);
+      document.getElementById('nilaiFinal').value = "Rp " + Math.round(final).toLocaleString('id-ID');
+    }
+
+    function kirimPengajuan(statusSubmit) {
+      var lokasi = document.getElementById('inputLokasi').value;
+      var statusSewa = document.getElementById('statusSewa').value;
+      var lokasiLama = document.getElementById('inputLokasiLama') ? document.getElementById('inputLokasiLama').value : "";
+      var namaPemilik = document.getElementById('inputNamaPemilik').value;
+      var hargaBaru = document.getElementById('hargaBaru').value;
+      var bankNama = document.getElementById('bankNama').value;
+      var bankNoRek = document.getElementById('bankNoRek').value;
+      var bankAn = document.getElementById('bankAn').value;
+      var fileInputSPK = document.getElementById('uploadSPK');
+
+      if (statusSubmit === "FINAL") {
+        if (!lokasi || !hargaBaru || !bankNama || !bankNoRek || !bankAn || !namaPemilik) {
+          Swal.fire({ icon: 'warning', title: 'Data Belum Lengkap', text: 'Semua field bertanda bintang merah wajib diisi!' });
+          return;
+        }
+        if (statusSewa === "Relokasi" && !lokasiLama) {
+          Swal.fire({ icon: 'warning', title: 'Lokasi Lama Wajib Diisi', text: 'Silakan tentukan lokasi lama asal relokasi!' });
+          return;
+        }
+      }
+
+      Swal.fire({ title: 'Memproses Data...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+      var fileSPK = (fileInputSPK && fileInputSPK.files && fileInputSPK.files.length > 0) ? fileInputSPK.files[0] : null;
+
+      var payload = {
+        kodeId: currentEditKodeId || "",
+        existingSpk: existingSpkUrl || "",
+        existingMemo: existingMemoUrl || "",
+        lokasi: lokasi,
+        statusSewa: statusSewa,
+        lokasiLama: lokasiLama,
+        namaPemilik: namaPemilik,
+        hargaBaru: hargaBaru,
+        dipotongPajak: document.getElementById('pajak').value,
+        pembayarPBB: document.getElementById('pembayarPBB').value,
+        masaSewa: document.getElementById('masaSewaBaru').value,
+        tglMulaiBaru: document.getElementById('tglMulaiBaru').value,
+        tglAkhirBaru: document.getElementById('tglAkhirBaru').value,
+        bankNama: bankNama,
+        bankNoRek: bankNoRek,
+        bankAn: bankAn,
+        tglCicilan1: document.getElementById('tglCicilan1').value,
+        jmlCicilan1: document.getElementById('jmlCicilan1').value,
+        tglCicilan2: document.getElementById('tglCicilan2').value,
+        jmlCicilan2: document.getElementById('jmlCicilan2').value,
+        tglCicilan3: document.getElementById('tglCicilan3').value,
+        jmlCicilan3: document.getElementById('jmlCicilan3').value,
+        depositBaru: document.getElementById('depositBaru').value,
+        tanggalHabisLama: document.getElementById('tanggalHabisLama').value,
+        masaSewaLama: document.getElementById('masaSewaLama').value,
+        hargaLama: document.getElementById('hargaLama').value,
+        depositLama: document.getElementById('depositLama').value,
+        catatanMemo: document.getElementById('catatanMemo').value
+      };
+
+      if (fileSPK) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          payload.spkData = e.target.result.split(',')[1];
+          payload.spkMimeType = fileSPK.type;
+          payload.spkName = fileSPK.name;
+          eksekusiSimpan(payload, statusSubmit);
+        };
+        reader.readAsDataURL(fileSPK);
+      } else {
+        eksekusiSimpan(payload, statusSubmit);
+      }
+    }
+
+    function eksekusiSimpan(payload, statusSubmit) {
+      google.script.run
+        .withSuccessHandler(function(kodeId) {
+          Swal.fire({
+            icon: 'success',
+            title: statusSubmit === 'DRAFT' ? 'Draft Tersimpan 💾' : 'Pengajuan Berhasil Dikirim 🚀',
+            text: 'Kode ID Transaksi: ' + kodeId
+          });
+          resetForm();
+          switchTab('riwayat');
+        })
+        .withFailureHandler(function(err) {
+          Swal.fire({ icon: 'error', title: 'Gagal', text: err.message });
+        })
+        .simpanPengajuanBaru(payload, statusSubmit);
+    }
+
+    function resetForm() {
+      currentEditKodeId = "";
+      existingSpkUrl = "";
+      existingMemoUrl = "";
+      document.getElementById('inputLokasi').value = "";
+      document.getElementById('hargaBaru').value = "";
+      document.getElementById('inputNamaPemilik').value = "";
+      document.getElementById('tglMulaiBaru').value = "";
+      document.getElementById('tglAkhirBaru').value = "";
+      document.getElementById('depositBaru').value = "";
+      document.getElementById('tglCicilan1').value = "";
+      document.getElementById('jmlCicilan1').value = "";
+      document.getElementById('tglCicilan2').value = "";
+      document.getElementById('jmlCicilan2').value = "";
+      document.getElementById('tglCicilan3').value = "";
+      document.getElementById('jmlCicilan3').value = "";
+      document.getElementById('catatanMemo').value = "";
+      if(document.getElementById('inputLokasiLama')) document.getElementById('inputLokasiLama').value = "";
+      cancelUploadFile();
+      cekStatusSewa();
+      toggleRelokasiUI();
+    }
+
+    function loadRiwayat() {
+      google.script.run.withSuccessHandler(function(list) {
+        var tbody = document.getElementById('tabelRiwayat');
+        if(!tbody) return;
+        if(list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Belum ada riwayat pengajuan.</td></tr>';
+          return;
+        }
+        var html = '';
+        list.forEach(function(item) {
+          var statusBadge = '';
+          var btnEdit = ''; 
+
+          if (item.statusDraft === "DRAFT") {
+            statusBadge = '<span style="background:#f1f5f9; color:#475569; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">💾 DRAF</span>';
+            btnEdit = '<button onclick="editAjuan(\'' + item.kodeId + '\')" style="background:#2563eb; color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:5px;">✏️ Edit Draf</button>';
+          } else if (item.statusMcx === "PENDING" || item.statusMcx === "") {
+            statusBadge = '<span style="background:#fef3c7; color:#d97706; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">⏳ Pending MCX</span>';
+          } else if (item.statusMcx === "REVISED") {
+            statusBadge = '<span style="background:#fee2e2; color:#b91c1c; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">❌ Revisi MCX</span>';
+            btnEdit = '<button onclick="editAjuan(\'' + item.kodeId + '\')" style="background:#f59e0b; color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:5px;">✏️ Revisi</button>';
+          } else if (item.statusDirektur === "Disetujui") {
+            statusBadge = '<span style="background:#e0e7ff; color:#3730a3; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">👔 ACC Direktur</span>';
+          } else {
+            statusBadge = '<span style="background:#d1fae5; color:#059669; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">✅ Dalam Proses</span>';
+          }
+
+          html += '<tr>' +
+            '<td><b>' + item.kodeId + '</b></td>' +
+            '<td>' + item.lokasi + '</td>' +
+            '<td>' + item.statusSewa + '</td>' +
+            '<td>Rp ' + Math.round(item.hargaBaru || 0).toLocaleString('id-ID') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td><span style="font-size:12px; color:#475569;">' + (item.catatanMcx || "-") + '</span></td>' +
+            '<td>' + btnEdit + '<button onclick="batalAjuan(\'' + item.kodeId + '\')" style="background:#ef4444; color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer; font-weight:bold;">🗑️ Hapus</button></td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+      }).getRiwayatPengajuan();
+    }
+
+    // FIX LENGKAP: POPULASI SEMUA ELEMEN SAAT EDIT DRAF / REVISI
+    function editAjuan(kodeId) {
+      currentEditKodeId = kodeId;
+      Swal.fire({ title: 'Menarik Data Draf...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      
+      google.script.run.withSuccessHandler(function(data) {
+        if(!data) { Swal.fire('Error', 'Data draf tidak ditemukan!', 'error'); return; }
+        
+        existingSpkUrl = data.spkDokumen || "";
+        existingMemoUrl = data.memoDokumen || "";
+
+        // Sewa Lama & Lokasi
+        document.getElementById('inputLokasi').value = data.lokasi || "";
+        document.getElementById('statusSewa').value = data.statusSewa || "Kontrak Baru";
+        document.getElementById('inputNamaPemilik').value = data.namaPemilik || "";
+        if(data.lokasiLama) document.getElementById('inputLokasiLama').value = data.lokasiLama;
+
+        document.getElementById('hargaLama').value = data.hargaLama ? parseFloat(data.hargaLama).toLocaleString('id-ID') : "";
+        document.getElementById('masaSewaLama').value = data.masaSewaLama || "";
+        document.getElementById('tanggalHabisLama').value = data.tanggalHabisLama || "";
+        document.getElementById('depositLama').value = data.depositLama ? parseFloat(data.depositLama).toLocaleString('id-ID') : "";
+
+        // Sewa Baru
+        document.getElementById('hargaBaru').value = data.hargaBaru ? parseFloat(data.hargaBaru).toLocaleString('id-ID') : "";
+        document.getElementById('pajak').value = data.dipotongPajak || "Ya, dipotong";
+        document.getElementById('pembayarPBB').value = data.pembayarPBB || "Pemilik";
+        document.getElementById('masaSewaBaru').value = data.masaSewaBaru || 1;
+        document.getElementById('tglMulaiBaru').value = data.tglMulaiBaru || "";
+        document.getElementById('tglAkhirBaru').value = data.tglAkhirBaru || "";
+
+        // Skema Pembayaran & Cicilan
+        if (data.tglCicilan2 || (data.jmlCicilan2 && data.jmlCicilan2 > 0)) {
+          document.getElementById('metodeBayar').value = 'Cicilan';
+        } else {
+          document.getElementById('metodeBayar').value = 'Lunas';
+        }
+        toggleCicilanUI();
+
+        document.getElementById('tglCicilan1').value = data.tglCicilan1 || "";
+        document.getElementById('jmlCicilan1').value = data.jmlCicilan1 ? parseFloat(data.jmlCicilan1).toLocaleString('id-ID') : "";
+        document.getElementById('tglCicilan2').value = data.tglCicilan2 || "";
+        document.getElementById('jmlCicilan2').value = data.jmlCicilan2 ? parseFloat(data.jmlCicilan2).toLocaleString('id-ID') : "";
+        document.getElementById('tglCicilan3').value = data.tglCicilan3 || "";
+        document.getElementById('jmlCicilan3').value = data.jmlCicilan3 ? parseFloat(data.jmlCicilan3).toLocaleString('id-ID') : "";
+        document.getElementById('depositBaru').value = data.depositBaru ? parseFloat(data.depositBaru).toLocaleString('id-ID') : "";
+
+        // Rekening Bank
+        if (data.bankNama) document.getElementById('bankNama').value = data.bankNama;
+        if (data.bankNoRek) document.getElementById('bankNoRek').value = data.bankNoRek;
+        if (data.bankAn) document.getElementById('bankAn').value = data.bankAn;
+
+        // Tampilkan Preview Dokumen Terunggah Jika Ada
+        if (data.spkDokumen && data.spkDokumen.includes("|ID:")) {
+          document.getElementById('fileNameDisplay').innerText = "📄 SPK Tersimpan di Drive";
+          document.getElementById('filePreviewBox').style.display = 'block';
+        }
+
+        hitungPajak();
+        toggleRelokasiUI();
+        cekStatusSewa();
+        switchTab('form');
+        Swal.close();
+      }).getDetailPengajuan(kodeId);
+    }
+
+    function batalAjuan(kodeId) {
+      Swal.fire({
+        title: 'Hapus Data?',
+        text: "Pengajuan ini akan dihapus permanen.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Ya, Hapus'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          google.script.run.withSuccessHandler(function() { loadRiwayat(); }).batalkanPengajuan(kodeId);
+        }
+      });
+    }
+
+    function keluarSistem() {
+      window.top.location.href = "<?= appUrl ?>";
+    }
+  </script>
+</body>
+</html>

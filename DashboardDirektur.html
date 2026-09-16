@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMPEWA - Dashboard Direktur Executive</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root { --primary: #4f46e5; --primary-hover: #4338ca; --bg-color: #f8fafc; --text-main: #0f172a; --text-muted: #64748b; --border-color: #e2e8f0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+    .sidebar { width: 260px; background: #1e1b4b; color: white; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+    .brand { font-size: 18px; font-weight: bold; color: #818cf8; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
+    .menu-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
+    .menu-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; font-weight: 500; color: #c7d2fe; margin-bottom: 5px; transition: all 0.2s; }
+    .menu-item.active, .menu-item:hover { background-color: #312e81; color: white; }
+    .main-content { flex-grow: 1; overflow-y: auto; padding: 30px; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+    .stats-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
+    .stat-card { background: white; border: 1px solid var(--border-color); padding: 18px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .stat-number { font-size: 22px; font-weight: bold; margin-top: 6px; }
+    .card { background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid var(--border-color); padding: 12px; text-align: left; }
+    th { background-color: #f1f5f9; color: var(--text-main); }
+    .btn-action { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: white; padding: 30px; border-radius: 16px; width: 680px; max-height: 85vh; overflow-y: auto; }
+    .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div>
+      <div class="brand">👔 <span>SIMPEWA Exec</span></div>
+      <ul class="menu-list">
+        <li class="menu-item active" id="tabAntrean" onclick="switchTab('antrean')">📥 Approval Hub</li>
+        <li class="menu-item" id="tabRiwayat" onclick="switchTab('riwayat')">📁 Arsip Approval</li>
+      </ul>
+    </div>
+    <div style="margin-top: auto; margin-bottom: 15px; padding-top: 15px; border-top: 1px solid #312e81;">
+      <p style="font-size: 11px; color: #a5b4fc; margin: 0;">Login Executive:</p>
+      <p style="font-size: 12px; font-weight: bold; color: white; margin: 3px 0;"><?= emailUser ?></p>
+    </div>
+    <div class="menu-item" style="color: #fca5a5;" onclick="keluarSistem()">🚪 Keluar</div>
+  </div>
+
+  <div class="main-content">
+    <div id="pageAntrean">
+      <div class="header-top">
+        <div>
+          <h2 style="margin: 0;">Executive Decision Hub</h2>
+          <p style="margin: 5px 0 0 0; color: var(--text-muted); font-size: 14px;">Persetujuan akhir anggaran sewa lokasi.</p>
+        </div>
+        <button class="btn-action" onclick="refreshExecutiveData()">🔄 Refresh Antrean</button>
+      </div>
+
+      <div class="stats-container">
+        <div class="stat-card">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">TOTAL PENGAJUAN</span>
+          <div class="stat-number" id="kpiTotalCount">0</div>
+        </div>
+        <div class="stat-card">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">PENDING APPROVAL</span>
+          <div class="stat-number" id="kpiPendingCount" style="color: #d97706;">0</div>
+        </div>
+        <div class="stat-card">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">ANGGARAN APPROVED</span>
+          <div class="stat-number" id="kpiApprovedBudget" style="color: #059669;">Rp 0</div>
+        </div>
+        <div class="stat-card">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">ANGGARAN PENDING</span>
+          <div class="stat-number" id="kpiPendingBudget" style="color: var(--primary);">Rp 0</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top: 0; font-size: 16px;">Pengajuan Siap Approval</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>KODE ID</th>
+              <th>Lokasi</th>
+              <th>Status Sewa</th>
+              <th>Nilai Final (Gross Up)</th>
+              <th>Catatan Sekretaris</th>
+              <th>Aksi Direktur</th>
+            </tr>
+          </thead>
+          <tbody id="tabelDirektur">
+            <tr><td colspan="6" style="text-align: center;">Memuat data... ⏳</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="pageRiwayat" style="display: none;">
+      <div class="header-top"><h2>Arsip Keputusan Eksekutif</h2></div>
+      <div class="card">
+        <div style="margin-bottom: 15px;">
+          <input type="text" id="searchRiwayat" placeholder="🔍 Cari Kode ID atau Lokasi..." onkeyup="filterRiwayat()" style="padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; font-size: 13px;">
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>KODE ID</th>
+              <th>Lokasi</th>
+              <th>Nilai Final</th>
+              <th>Status ACC</th>
+              <th>Catatan Direktur</th>
+            </tr>
+          </thead>
+          <tbody id="tabelRiwayat">
+            <tr><td colspan="5" style="text-align: center;">Memuat riwayat...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalDirektur">
+    <div class="modal-content">
+      <h3 style="margin-top: 0; color: var(--primary);">Executive Review Pengajuan</h3>
+      <p id="modalKodeId" style="font-weight: bold; font-size: 14px; color: var(--text-muted); margin-top: -10px;"></p>
+      <div class="modal-grid">
+        <div><b>Lokasi NF:</b> <span id="mLokasi"></span></div>
+        <div><b>Status Sewa:</b> <span id="mStatusSewa"></span></div>
+        <div><b>Harga Sewa Pokok:</b> <span id="mHargaPokok"></span></div>
+        <div><b>Nilai Final (Gross):</b> <span id="mHargaBersih" style="color:#059669; font-weight:bold;"></span></div>
+      </div>
+      <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+        <p style="margin: 0; font-size: 12px; color: var(--text-muted);"><b>Catatan Verifikasi Sekretaris:</b></p>
+        <p id="mCatatanSekretaris" style="margin: 5px 0 0 0; font-size: 13px; font-style: italic;"></p>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 25px;">
+        <button onclick="tutupModal()" style="background: #cbd5e1; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">Tutup</button>
+        <button onclick="approvalDirektur('Tolak')" style="background: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">❌ Tolak</button>
+        <button onclick="approvalDirektur('Disetujui')" style="background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">✒️ Setujui & ACC</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var globalData = [];
+    var selectedItem = null;
+
+    window.onload = function() { refreshExecutiveData(); };
+
+    function switchTab(tab) {
+      if (tab === 'antrean') {
+        document.getElementById('pageAntrean').style.display = 'block';
+        document.getElementById('pageRiwayat').style.display = 'none';
+        document.getElementById('tabAntrean').className = 'menu-item active';
+        document.getElementById('tabRiwayat').className = 'menu-item';
+        refreshExecutiveData();
+      } else {
+        document.getElementById('pageAntrean').style.display = 'none';
+        document.getElementById('pageRiwayat').style.display = 'block';
+        document.getElementById('tabAntrean').className = 'menu-item';
+        document.getElementById('tabRiwayat').className = 'menu-item active';
+        loadRiwayatDirektur();
+      }
+    }
+
+    function refreshExecutiveData() {
+      google.script.run.withSuccessHandler(function(res) {
+        document.getElementById('kpiTotalCount').innerText = res.totalPengajuan;
+        document.getElementById('kpiPendingCount').innerText = res.countPending;
+        document.getElementById('kpiApprovedBudget').innerText = "Rp " + Math.round(res.totalNominalApproved).toLocaleString('id-ID');
+        document.getElementById('kpiPendingBudget').innerText = "Rp " + Math.round(res.totalNominalPending).toLocaleString('id-ID');
+      }).getExecutiveAnalytics();
+      loadDataDirektur();
+    }
+
+    function loadDataDirektur() {
+      google.script.run.withSuccessHandler(function(list) {
+        globalData = list;
+        var tbody = document.getElementById('tabelDirektur');
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Inbox Bersih! Tidak ada antrean pengajuan.</td></tr>';
+          return;
+        }
+        var html = '';
+        list.forEach(function(item, idx) {
+          html += '<tr>' +
+            '<td><b>' + item.kodeId + '</b></td>' +
+            '<td>' + item.lokasi + '</td>' +
+            '<td>' + item.statusSewa + '</td>' +
+            '<td><b style="color:#059669;">Rp ' + Math.round(item.nilaiGrossUp || item.hargaPokok).toLocaleString('id-ID') + '</b></td>' +
+            '<td>' + item.catatanSekretaris + '</td>' +
+            '<td><button class="btn-action" onclick="bukaModal(' + idx + ')">🔍 Review & ACC</button></td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+      }).getPengajuanDirektur();
+    }
+
+    function bukaModal(idx) {
+      selectedItem = globalData[idx];
+      document.getElementById('modalKodeId').innerText = "KODE ID: " + selectedItem.kodeId;
+      document.getElementById('mLokasi').innerText = selectedItem.lokasi;
+      document.getElementById('mStatusSewa').innerText = selectedItem.statusSewa;
+      document.getElementById('mHargaPokok').innerText = "Rp " + Math.round(selectedItem.hargaPokok || 0).toLocaleString('id-ID');
+      document.getElementById('mHargaBersih').innerText = "Rp " + Math.round(selectedItem.nilaiGrossUp || selectedItem.hargaPokok || 0).toLocaleString('id-ID');
+      document.getElementById('mCatatanSekretaris').innerText = selectedItem.catatanSekretaris;
+      document.getElementById('modalDirektur').style.display = 'flex';
+    }
+
+    function tutupModal() { document.getElementById('modalDirektur').style.display = 'none'; }
+
+    function approvalDirektur(keputusan) {
+      tutupModal();
+      Swal.fire({
+        title: 'Konfirmasi Keputusan', text: 'Proses status ' + keputusan + '?',
+        icon: 'question', showCancelButton: true, confirmButtonText: 'Ya, Eksekusi'
+      }).then((res) => {
+        if (res.isConfirmed) {
+          Swal.fire({ title: 'Menyimpan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          google.script.run
+            .withSuccessHandler(function(msg) {
+              Swal.fire('Berhasil', msg, 'success');
+              refreshExecutiveData();
+            })
+            .verifikasiDirektur(selectedItem.kodeId, keputusan, "ACC via Executive Portal");
+        }
+      });
+    }
+
+    function loadRiwayatDirektur() {
+      google.script.run.withSuccessHandler(function(list) {
+        var tbody = document.getElementById('tabelRiwayat');
+        if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Belum ada arsip.</td></tr>'; return; }
+        var html = '';
+        list.forEach(function(item) {
+          html += '<tr>' +
+            '<td><b>' + item.kodeId + '</b></td>' +
+            '<td>' + item.lokasi + '</td>' +
+            '<td>Rp ' + Math.round(item.nilaiGrossUp).toLocaleString('id-ID') + '</td>' +
+            '<td><b>' + item.statusDirektur + '</b></td>' +
+            '<td>' + item.catatanDirektur + '</td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+      }).getRiwayatDirektur();
+    }
+
+    function filterRiwayat() {
+      var input = document.getElementById('searchRiwayat').value.toLowerCase();
+      var rows = document.querySelectorAll('#tabelRiwayat tr');
+      rows.forEach(function(row) {
+        var text = row.innerText.toLowerCase();
+        if (text.includes('memuat') || text.includes('belum ada')) return;
+        row.style.display = text.includes(input) ? '' : 'none';
+      });
+    }
+
+    function keluarSistem() {
+      Swal.fire({ title: 'Keluar?', icon: 'question', showCancelButton: true, confirmButtonText: 'Ya' })
+        .then((res) => { if (res.isConfirmed) window.top.location.href = "<?= ScriptApp.getService().getUrl() ?>"; });
+    }
+  </script>
+</body>
+</html>

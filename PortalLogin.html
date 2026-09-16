@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMPEWA - Portal Akses</title>
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .portal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      width: 520px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+      text-align: center;
+    }
+
+    .logo-badge {
+      font-size: 38px;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      margin: 0 0 5px 0;
+      color: var(--primary);
+    }
+
+    p.sub {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    .role-card {
+      background: #f1f5f9;
+      border: 2px solid transparent;
+      padding: 20px 15px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .role-card:hover {
+      background: #eff6ff;
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    .role-icon {
+      font-size: 26px;
+    }
+
+    .role-title {
+      font-weight: bold;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .user-footer {
+      border-top: 1px solid var(--border);
+      padding-top: 15px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="portal-card">
+    <div class="logo-badge">🏢</div>
+    <h2>SIMPEWA Portal</h2>
+    <p class="sub">Selamat datang, <b><?= namaUser ?></b>! Pilih role dashboard untuk melanjutkan:</p>
+
+    <div class="role-grid" id="roleContainer">
+      <!-- Pilihan Dashboard Rendition -->
+    </div>
+
+    <div class="user-footer">
+      Terautentikasi sebagai: <b><?= emailAwal ?></b>
+    </div>
+  </div>
+
+  <script>
+    // Konversi array dari server menjadi JSON valid di sisi browser
+    var userRoles = <?!= JSON.stringify(userRoles || []) ?>;
+    var appUrl = "<?= appUrl ?>";
+
+    var roleConfig = {
+      "Negosiator": { icon: "📊", label: "Dashboard Negosiator" },
+      "Sekretaris": { icon: "📋", label: "Dashboard Sekretaris" },
+      "Direktur": { icon: "👔", label: "Executive Analytics" },
+      "Keuangan": { icon: "💳", label: "Dashboard Keuangan" },
+      "Admin": { icon: "⚙️", label: "Master Admin Hub" },
+      "MCX": { icon: "🔍", label: "Dashboard Control MCX" },
+      "Informasi": { icon: "📈", label: "Portal Informasi Rekap" }
+    };
+
+    window.onload = function() {
+      var container = document.getElementById('roleContainer');
+      var html = '';
+
+      if (!userRoles || userRoles.length === 0) {
+        container.innerHTML = '<p style="color:#ef4444; font-size:13px; grid-column: span 2;">Tidak ada role aktif yang ditemukan untuk akun ini.</p>';
+        return;
+      }
+
+      userRoles.forEach(function(role) {
+        var cfg = roleConfig[role] || { icon: "🔑", label: "Dashboard " + role };
+        html += '<div class="role-card" onclick="masukDashboard(\'' + role + '\')">' +
+                  '<span class="role-icon">' + cfg.icon + '</span>' +
+                  '<span class="role-title">' + cfg.label + '</span>' +
+                '</div>';
+      });
+
+      container.innerHTML = html;
+    };
+
+    function masukDashboard(role) {
+      window.location.href = appUrl + "?page=dashboard&role=" + encodeURIComponent(role);
+    }
+  </script>
+
+</body>
+
+</html>
