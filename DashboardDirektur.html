@@ -163,36 +163,51 @@
     }
 
     function refreshExecutiveData() {
-      google.script.run.withSuccessHandler(function(res) {
-        document.getElementById('kpiTotalCount').innerText = res.totalPengajuan;
-        document.getElementById('kpiPendingCount').innerText = res.countPending;
-        document.getElementById('kpiApprovedBudget').innerText = "Rp " + Math.round(res.totalNominalApproved).toLocaleString('id-ID');
-        document.getElementById('kpiPendingBudget').innerText = "Rp " + Math.round(res.totalNominalPending).toLocaleString('id-ID');
-      }).getExecutiveAnalytics();
+      google.script.run
+        .withSuccessHandler(function(res) {
+          document.getElementById('kpiTotalCount').innerText = res.totalPengajuan;
+          document.getElementById('kpiPendingCount').innerText = res.countPending;
+          document.getElementById('kpiApprovedBudget').innerText = "Rp " + Math.round(res.totalNominalApproved).toLocaleString('id-ID');
+          document.getElementById('kpiPendingBudget').innerText = "Rp " + Math.round(res.totalNominalPending).toLocaleString('id-ID');
+        })
+        .withFailureHandler(function(err) {
+          Swal.fire({ icon: 'error', title: 'Gagal Memuat Statistik', text: err.message });
+        })
+        .getExecutiveAnalytics();
       loadDataDirektur();
     }
 
     function loadDataDirektur() {
-      google.script.run.withSuccessHandler(function(list) {
-        globalData = list;
-        var tbody = document.getElementById('tabelDirektur');
-        if (list.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Inbox Bersih! Tidak ada antrean pengajuan.</td></tr>';
-          return;
-        }
-        var html = '';
-        list.forEach(function(item, idx) {
-          html += '<tr>' +
-            '<td><b>' + item.kodeId + '</b></td>' +
-            '<td>' + item.lokasi + '</td>' +
-            '<td>' + item.statusSewa + '</td>' +
-            '<td><b style="color:#059669;">Rp ' + Math.round(item.nilaiGrossUp || item.hargaPokok).toLocaleString('id-ID') + '</b></td>' +
-            '<td>' + item.catatanSekretaris + '</td>' +
-            '<td><button class="btn-action" onclick="bukaModal(' + idx + ')">🔍 Review & ACC</button></td>' +
-            '</tr>';
-        });
-        tbody.innerHTML = html;
-      }).getPengajuanDirektur();
+      var tbody = document.getElementById('tabelDirektur');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Memuat data... ⏳</td></tr>';
+
+      google.script.run
+        .withSuccessHandler(function(list) {
+          globalData = list;
+          var tbody = document.getElementById('tabelDirektur');
+          if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Inbox Bersih! Tidak ada antrean pengajuan.</td></tr>';
+            return;
+          }
+          var html = '';
+          list.forEach(function(item, idx) {
+            html += '<tr>' +
+              '<td><b>' + item.kodeId + '</b></td>' +
+              '<td>' + item.lokasi + '</td>' +
+              '<td>' + item.statusSewa + '</td>' +
+              '<td><b style="color:#059669;">Rp ' + Math.round(item.nilaiGrossUp || item.hargaPokok).toLocaleString('id-ID') + '</b></td>' +
+              '<td>' + item.catatanSekretaris + '</td>' +
+              '<td><button class="btn-action" onclick="bukaModal(' + idx + ')">🔍 Review & ACC</button></td>' +
+              '</tr>';
+          });
+          tbody.innerHTML = html;
+        })
+        .withFailureHandler(function(err) {
+          var tbody = document.getElementById('tabelDirektur');
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#dc2626; font-weight:bold;">⚠️ Gagal memuat data: ' + err.message + '</td></tr>';
+          Swal.fire({ icon: 'error', title: 'Gagal Memuat Data', text: err.message });
+        })
+        .getPengajuanDirektur();
     }
 
     function bukaModal(idx) {
@@ -221,27 +236,40 @@
               Swal.fire('Berhasil', msg, 'success');
               refreshExecutiveData();
             })
+            .withFailureHandler(function(err) {
+              Swal.fire('Gagal', err.message, 'error');
+            })
             .verifikasiDirektur(selectedItem.kodeId, keputusan, "ACC via Executive Portal");
         }
       });
     }
 
     function loadRiwayatDirektur() {
-      google.script.run.withSuccessHandler(function(list) {
-        var tbody = document.getElementById('tabelRiwayat');
-        if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Belum ada arsip.</td></tr>'; return; }
-        var html = '';
-        list.forEach(function(item) {
-          html += '<tr>' +
-            '<td><b>' + item.kodeId + '</b></td>' +
-            '<td>' + item.lokasi + '</td>' +
-            '<td>Rp ' + Math.round(item.nilaiGrossUp).toLocaleString('id-ID') + '</td>' +
-            '<td><b>' + item.statusDirektur + '</b></td>' +
-            '<td>' + item.catatanDirektur + '</td>' +
-            '</tr>';
-        });
-        tbody.innerHTML = html;
-      }).getRiwayatDirektur();
+      var tbody = document.getElementById('tabelRiwayat');
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Memuat riwayat...</td></tr>';
+
+      google.script.run
+        .withSuccessHandler(function(list) {
+          var tbody = document.getElementById('tabelRiwayat');
+          if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Belum ada arsip.</td></tr>'; return; }
+          var html = '';
+          list.forEach(function(item) {
+            html += '<tr>' +
+              '<td><b>' + item.kodeId + '</b></td>' +
+              '<td>' + item.lokasi + '</td>' +
+              '<td>Rp ' + Math.round(item.nilaiGrossUp).toLocaleString('id-ID') + '</td>' +
+              '<td><b>' + item.statusDirektur + '</b></td>' +
+              '<td>' + item.catatanDirektur + '</td>' +
+              '</tr>';
+          });
+          tbody.innerHTML = html;
+        })
+        .withFailureHandler(function(err) {
+          var tbody = document.getElementById('tabelRiwayat');
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#dc2626; font-weight:bold;">⚠️ Gagal memuat riwayat: ' + err.message + '</td></tr>';
+          Swal.fire({ icon: 'error', title: 'Gagal Memuat Riwayat', text: err.message });
+        })
+        .getRiwayatDirektur();
     }
 
     function filterRiwayat() {

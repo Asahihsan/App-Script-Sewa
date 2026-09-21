@@ -111,6 +111,12 @@ function getUserDetails(email) {
 // ==========================================
 // 2. BACKEND NEGOSIATOR (DRAFT, RELOKASI & PRIVASI)
 // ==========================================
+// Baris pertama data transaksi di NEW_INPUT (0-based index array getValues()).
+// Sheet punya 3 baris header (grup/sub-grup/leaf) + 1 baris metadata nomor
+// urut kolom, jadi data mulai di baris ke-5 (index 4).
+var NEW_INPUT_DATA_START_ROW = 4;
+var NEW_INPUT_HEADER_ROWS = 3;
+
 function simpanPengajuanBaru(data, statusSubmit) {
   var roles = getUserDetails(Session.getActiveUser().getEmail()).roles;
   if (!roles.includes("Negosiator") && !roles.includes("Admin")) throw new Error("Akses Ditolak: Hak akses Negosiator dibutuhkan.");
@@ -122,6 +128,9 @@ function simpanPengajuanBaru(data, statusSubmit) {
     var emailNegosiator = Session.getActiveUser().getEmail();
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName("NEW_INPUT");
+    var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+    var lastCol = sheet.getLastColumn();
+    var idx = function (headerName) { return getColIndex(colMap, headerName); };
 
     if (!statusSubmit) statusSubmit = "FINAL";
 
@@ -136,17 +145,17 @@ function simpanPengajuanBaru(data, statusSubmit) {
 
     var primaryKey = data.kodeId;
     var isEdit = false;
+    var findData = sheet.getDataRange().getValues();
 
     if (primaryKey && primaryKey !== "") {
       isEdit = true;
     } else {
       var maxSeq = 0;
-      var findData = sheet.getDataRange().getValues();
       var kodeLokasi = data.lokasi ? data.lokasi.substring(0, 3).toUpperCase() : "REL";
       var tahun = new Date().getFullYear();
 
-      for (var r = 4; r < findData.length; r++) {
-        var existingId = String(findData[r][0] || "");
+      for (var r = NEW_INPUT_DATA_START_ROW; r < findData.length; r++) {
+        var existingId = String(findData[r][idx('KODE ID')] || "");
         if (existingId.includes("-")) {
           var parts = existingId.split("-");
           if (parts.length === 3) {
@@ -178,49 +187,58 @@ function simpanPengajuanBaru(data, statusSubmit) {
     var infoRekeningBank = data.bankNama ? (data.bankNama.toUpperCase() + " - " + data.bankNoRek + " a.n " + data.bankAn.toUpperCase()) : "";
     var tahunSewaLama = data.tanggalHabisLama ? String(data.tanggalHabisLama).substring(0, 4) : (data.tahunSewaLama || "");
 
-    var barisData = [
-      primaryKey,
-      new Date().getFullYear(),
-      data.lokasi || "",
-      data.statusSewa || "Kontrak Baru",
-      data.pembayarPBB || "Pemilik",
-      hargaBaru,
-      nominalPajak,
-      hargaSetelahPajak,
-      parseInt(data.masaSewa) || 1,
-      data.tglAkhirBaru || "",
-      nilaiGrossUp,
-      data.tglCicilan1 || "", parseFloat(String(data.jmlCicilan1 || "0").replace(/\./g, '')) || 0,
-      data.tglCicilan2 || "", parseFloat(String(data.jmlCicilan2 || "0").replace(/\./g, '')) || 0,
-      data.tglCicilan3 || "", parseFloat(String(data.jmlCicilan3 || "0").replace(/\./g, '')) || 0,
-      parseFloat(String(data.depositBaru || "0").replace(/\./g, '')) || 0,
-      spkCellContent,
-      memoCellContent,
-      tahunSewaLama,
-      data.tanggalHabisLama || "",
-      parseInt(data.masaSewaLama) || 0,
-      parseFloat(String(data.hargaLama || "0").replace(/\./g, '')) || 0,
-      parseFloat(String(data.depositLama || "0").replace(/\./g, '')) || 0,
-      statusSubmit === "FINAL" ? "PENDING" : "",
-      "", "", "", "", "",
-      infoRekeningBank,
-      "", "", "", "", "",
-      statusSubmit,
-      data.namaPemilik || "",
-      data.lokasiLama || "",
-      emailNegosiator
-    ];
+    // Baris ditulis lewat peta nama header, bukan posisi angka -- kalau
+    // suatu saat ada kolom baru disisipkan lagi di sheet, baris ini TIDAK
+    // perlu diubah, karena getColIndex akan cari ulang posisinya otomatis.
+    var rowArr = new Array(lastCol).fill("");
+    var set = function (headerName, value) { rowArr[idx(headerName)] = value; };
+
+    set('KODE ID', primaryKey);
+    set('PERIODE / TAHUN INPUT', new Date().getFullYear());
+    set('LOKASI', data.lokasi || "");
+    set('STATUS SEWA', data.statusSewa || "Kontrak Baru");
+    set('PIHAK PEMBAYAR PAJAK PBB', data.pembayarPBB || "Pemilik");
+    set('NIK', data.nik || "");
+    set('NPWP', data.npwp || "");
+    set('HARGA SEBELUM PAJAK (POKOK) SEWA', hargaBaru);
+    set('PAJAK SEWA (YANG DIPOTONG)', nominalPajak);
+    set('HARGA SETELAH PAJAK (DITRANSFER BERSIH)', hargaSetelahPajak);
+    set('MASA SEWA (TAHUN)', parseInt(data.masaSewa) || 1);
+    set('TANGGAL HABIS KONTRAK', data.tglAkhirBaru || "");
+    set('PENILAIAN HARGA SEWA (GROSS UP)', nilaiGrossUp);
+    set('LUNAS / CICILAN 1 - TANGGAL', data.tglCicilan1 || "");
+    set('LUNAS / CICILAN 1 - JUMLAH', parseFloat(String(data.jmlCicilan1 || "0").replace(/\./g, '')) || 0);
+    set('LUNAS / CICILAN 2 - TANGGAL', data.tglCicilan2 || "");
+    set('LUNAS / CICILAN 2 - JUMLAH', parseFloat(String(data.jmlCicilan2 || "0").replace(/\./g, '')) || 0);
+    set('LUNAS / CICILAN 3 - TANGGAL', data.tglCicilan3 || "");
+    set('LUNAS / CICILAN 3 - JUMLAH', parseFloat(String(data.jmlCicilan3 || "0").replace(/\./g, '')) || 0);
+    set('JUMLAH PEMBAYARAN DEPOSIT (JIKA ADA)', parseFloat(String(data.depositBaru || "0").replace(/\./g, '')) || 0);
+    set('SPK (LINK DRIVE)', spkCellContent);
+    set('MEMO (LINK DRIVE)', memoCellContent);
+    set('SEWA LAMA - TAHUN / PERIODE', tahunSewaLama);
+    set('SEWA LAMA - TANGGAL HABIS KONTRAK', data.tanggalHabisLama || "");
+    set('SEWA LAMA - MASA SEWA (TAHUN)', parseInt(data.masaSewaLama) || 0);
+    set('SEWA LAMA - HARGA SETELAH PAJAK (NET)', parseFloat(String(data.hargaLama || "0").replace(/\./g, '')) || 0);
+    set('SEWA LAMA - DEPOSIT', parseFloat(String(data.depositLama || "0").replace(/\./g, '')) || 0);
+    set('STATUS MCX', statusSubmit === "FINAL" ? "PENDING" : "");
+    set('INFO REKENING BANK', infoRekeningBank);
+    set('STATUS DRAF', statusSubmit);
+    set('NAMA PEMILIK', data.namaPemilik || "");
+    set('LOKASI LAMA', data.lokasiLama || "");
+    set('EMAIL NEGOSIATOR', emailNegosiator);
+    // Kolom lain (CATATAN MCX, STATUS/CATATAN SEKRETARIS & DIREKTUR,
+    // HARDCOPY SPK, info pencairan pajak, dst) sengaja dibiarkan kosong --
+    // itu wilayah role selanjutnya di alur approval, bukan Negosiator.
 
     if (isEdit) {
-      var findData = sheet.getDataRange().getValues();
-      for (var row = 4; row < findData.length; row++) {
-        if (findData[row][0] === primaryKey) {
-          sheet.getRange(row + 1, 1, 1, barisData.length).setValues([barisData]);
+      for (var row = NEW_INPUT_DATA_START_ROW; row < findData.length; row++) {
+        if (findData[row][idx('KODE ID')] === primaryKey) {
+          sheet.getRange(row + 1, 1, 1, rowArr.length).setValues([rowArr]);
           break;
         }
       }
     } else {
-      sheet.appendRow(barisData);
+      sheet.appendRow(rowArr);
     }
 
     return primaryKey;
@@ -232,25 +250,27 @@ function getRiwayatPengajuan() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return [];
 
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var result = [];
 
-  for (var i = 4; i < data.length; i++) {
-    var emailPembuat = String(data[i][40] || "").trim().toLowerCase();
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    var emailPembuat = String(data[i][idx('EMAIL NEGOSIATOR')] || "").trim().toLowerCase();
 
-    if (data[i][0] !== "" && emailPembuat === emailLogin) {
+    if (data[i][idx('KODE ID')] !== "" && emailPembuat === emailLogin) {
       result.push({
-        kodeId: data[i][0],
-        lokasi: data[i][2],
-        statusSewa: data[i][3],
-        hargaBaru: data[i][5],
-        statusDraft: data[i][37] || "FINAL",
-        statusMcx: data[i][25] || "-",
-        catatanMcx: data[i][26] || "-",
-        statusSekretaris: data[i][27],
-        catatanSekretaris: data[i][28] || "-",
-        statusDirektur: data[i][29],
-        ntpn: data[i][34]
+        kodeId: data[i][idx('KODE ID')],
+        lokasi: data[i][idx('LOKASI')],
+        statusSewa: data[i][idx('STATUS SEWA')],
+        hargaBaru: data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+        statusDraft: data[i][idx('STATUS DRAF')] || "FINAL",
+        statusMcx: data[i][idx('STATUS MCX')] || "-",
+        catatanMcx: data[i][idx('CATATAN MCX')] || "-",
+        statusSekretaris: data[i][idx('STATUS SEKRETARIS')],
+        catatanSekretaris: data[i][idx('CATATAN SEKRETARIS')] || "-",
+        statusDirektur: data[i][idx('STATUS DIREKTUR')],
+        ntpn: data[i][idx('NOMOR NTPN RESMI')]
       });
     }
   }
@@ -260,15 +280,18 @@ function getRiwayatPengajuan() {
 function getDetailPengajuan(kodeId) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return null;
+
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
 
-  for (var i = 4; i < data.length; i++) {
-    if (data[i][0] === kodeId) {
-      var hrgBaru = parseFloat(data[i][5]) || 0;
-      var grsUp = parseFloat(data[i][10]) || 0;
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    if (data[i][idx('KODE ID')] === kodeId) {
+      var hrgBaru = parseFloat(data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')]) || 0;
+      var grsUp = parseFloat(data[i][idx('PENILAIAN HARGA SEWA (GROSS UP)')]) || 0;
       var fmtTgl = function (v) { return (v instanceof Date) ? v.toISOString().split('T')[0] : (v || ""); };
 
-      var infoRek = String(data[i][31] || "");
+      var infoRek = String(data[i][idx('INFO REKENING BANK')] || "");
       var bankNama = "", bankNoRek = "", bankAn = "";
       if (infoRek.includes(" - ") && infoRek.includes(" a.n ")) {
         var parts1 = infoRek.split(" - ");
@@ -278,8 +301,8 @@ function getDetailPengajuan(kodeId) {
         bankAn = parts2[1];
       }
 
-      var tglAkhirFix = fmtTgl(data[i][9]);
-      var masaSewaFix = parseInt(data[i][8]) || 1;
+      var tglAkhirFix = fmtTgl(data[i][idx('TANGGAL HABIS KONTRAK')]);
+      var masaSewaFix = parseInt(data[i][idx('MASA SEWA (TAHUN)')]) || 1;
       var tglMulaiFix = "";
       if (tglAkhirFix && masaSewaFix) {
         var d = new Date(tglAkhirFix);
@@ -289,34 +312,38 @@ function getDetailPengajuan(kodeId) {
       }
 
       return {
-        kodeId: data[i][0],
-        lokasi: data[i][2],
-        statusSewa: data[i][3],
-        pembayarPBB: data[i][4] || "Pemilik",
+        kodeId: data[i][idx('KODE ID')],
+        lokasi: data[i][idx('LOKASI')],
+        statusSewa: data[i][idx('STATUS SEWA')],
+        pembayarPBB: data[i][idx('PIHAK PEMBAYAR PAJAK PBB')] || "Pemilik",
+        nik: data[i][idx('NIK')] || "",
+        npwp: data[i][idx('NPWP')] || "",
         hargaBaru: hrgBaru,
         dipotongPajak: (Math.round(grsUp) === Math.round(hrgBaru)) ? "Ya, dipotong" : "Tidak (Gross Up)",
         masaSewaBaru: masaSewaFix,
         tglMulaiBaru: tglMulaiFix,
         tglAkhirBaru: tglAkhirFix,
-        tglCicilan1: fmtTgl(data[i][11]),
-        jmlCicilan1: data[i][12] || 0,
-        tglCicilan2: fmtTgl(data[i][13]),
-        jmlCicilan2: data[i][14] || 0,
-        tglCicilan3: fmtTgl(data[i][15]),
-        jmlCicilan3: data[i][16] || 0,
-        depositBaru: data[i][17] || 0,
-        spkDokumen: data[i][18] || "",
-        memoDokumen: data[i][19] || "",
-        tahunSewaLama: data[i][20] || "",
-        tanggalHabisLama: fmtTgl(data[i][21]),
-        masaSewaLama: data[i][22] || "",
-        hargaLama: data[i][23] || 0,
-        depositLama: data[i][24] || 0,
-        catatanPenolakan: data[i][30] ? data[i][30] : (data[i][28] ? data[i][28] : (data[i][26] || "Tidak ada catatan.")),
+        tglCicilan1: fmtTgl(data[i][idx('LUNAS / CICILAN 1 - TANGGAL')]),
+        jmlCicilan1: data[i][idx('LUNAS / CICILAN 1 - JUMLAH')] || 0,
+        tglCicilan2: fmtTgl(data[i][idx('LUNAS / CICILAN 2 - TANGGAL')]),
+        jmlCicilan2: data[i][idx('LUNAS / CICILAN 2 - JUMLAH')] || 0,
+        tglCicilan3: fmtTgl(data[i][idx('LUNAS / CICILAN 3 - TANGGAL')]),
+        jmlCicilan3: data[i][idx('LUNAS / CICILAN 3 - JUMLAH')] || 0,
+        depositBaru: data[i][idx('JUMLAH PEMBAYARAN DEPOSIT (JIKA ADA)')] || 0,
+        spkDokumen: data[i][idx('SPK (LINK DRIVE)')] || "",
+        memoDokumen: data[i][idx('MEMO (LINK DRIVE)')] || "",
+        tahunSewaLama: data[i][idx('SEWA LAMA - TAHUN / PERIODE')] || "",
+        tanggalHabisLama: fmtTgl(data[i][idx('SEWA LAMA - TANGGAL HABIS KONTRAK')]),
+        masaSewaLama: data[i][idx('SEWA LAMA - MASA SEWA (TAHUN)')] || "",
+        hargaLama: data[i][idx('SEWA LAMA - HARGA SETELAH PAJAK (NET)')] || 0,
+        depositLama: data[i][idx('SEWA LAMA - DEPOSIT')] || 0,
+        catatanPenolakan: data[i][idx('CATATAN DIREKTUR')] ? data[i][idx('CATATAN DIREKTUR')] :
+          (data[i][idx('CATATAN SEKRETARIS')] ? data[i][idx('CATATAN SEKRETARIS')] :
+          (data[i][idx('CATATAN MCX')] || "Tidak ada catatan.")),
         bankNama: bankNama, bankNoRek: bankNoRek, bankAn: bankAn,
-        statusDraft: data[i][37] || "FINAL",
-        namaPemilik: data[i][38] || "",
-        lokasiLama: data[i][39] || ""
+        statusDraft: data[i][idx('STATUS DRAF')] || "FINAL",
+        namaPemilik: data[i][idx('NAMA PEMILIK')] || "",
+        lokasiLama: data[i][idx('LOKASI LAMA')] || ""
       };
     }
   }
@@ -326,10 +353,14 @@ function getDetailPengajuan(kodeId) {
 function batalkanPengajuan(kodeId) {
   var lock = LockService.getScriptLock(); try { lock.waitLock(10000); } catch (e) { throw new Error("Sistem sibuk."); }
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT"); var data = sheet.getDataRange().getValues();
-    for (var i = 4; i < data.length; i++) {
-      if (data[i][0] === kodeId) {
-        var spk = data[i][18], memo = data[i][19];
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
+    var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+    var idx = function (headerName) { return getColIndex(colMap, headerName); };
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+      if (data[i][idx('KODE ID')] === kodeId) {
+        var spk = data[i][idx('SPK (LINK DRIVE)')], memo = data[i][idx('MEMO (LINK DRIVE)')];
         if (spk && spk.indexOf("|ID:") !== -1) { try { DriveApp.getFileById(spk.split("|ID:")[1]).setTrashed(true); } catch (e) { } }
         if (memo && memo.indexOf("|ID:") !== -1) { try { DriveApp.getFileById(memo.split("|ID:")[1]).setTrashed(true); } catch (e) { } }
         sheet.deleteRow(i + 1); return "Pengajuan dibatalkan.";
@@ -347,20 +378,33 @@ function getPengajuanMCX() {
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return [];
+
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var result = [];
 
-  for (var i = 4; i < data.length; i++) {
-    var statusDraft = String(data[i][37] || "").trim();
-    var statusMcx = String(data[i][25] || "").trim();
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    var statusDraft = String(data[i][idx('STATUS DRAF')] || "").trim();
+    var statusMcx = String(data[i][idx('STATUS MCX')] || "").trim();
 
-    if (data[i][0] !== "" && statusDraft === "FINAL" && (statusMcx === "PENDING" || statusMcx === "")) {
+    if (data[i][idx('KODE ID')] !== "" && statusDraft === "FINAL" && (statusMcx === "PENDING" || statusMcx === "")) {
+      var tglAkhir = data[i][idx('TANGGAL HABIS KONTRAK')];
       result.push({
-        kodeId: data[i][0], lokasi: data[i][2], statusSewa: data[i][3], pembayarPBB: data[i][4],
-        hargaPokok: data[i][5], pajak: data[i][6], hargaBersih: data[i][7], masaSewa: data[i][8],
-        tglAkhirBaru: data[i][9] instanceof Date ? data[i][9].toISOString().split('T')[0] : data[i][9],
-        nilaiGrossUp: data[i][10], spkDokumen: data[i][18], memoDokumen: data[i][19],
-        namaPemilik: data[i][38], lokasiLama: data[i][39] || "-"
+        kodeId: data[i][idx('KODE ID')],
+        lokasi: data[i][idx('LOKASI')],
+        statusSewa: data[i][idx('STATUS SEWA')],
+        pembayarPBB: data[i][idx('PIHAK PEMBAYAR PAJAK PBB')],
+        hargaPokok: data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+        pajak: data[i][idx('PAJAK SEWA (YANG DIPOTONG)')],
+        hargaBersih: data[i][idx('HARGA SETELAH PAJAK (DITRANSFER BERSIH)')],
+        masaSewa: data[i][idx('MASA SEWA (TAHUN)')],
+        tglAkhirBaru: tglAkhir instanceof Date ? tglAkhir.toISOString().split('T')[0] : tglAkhir,
+        nilaiGrossUp: data[i][idx('PENILAIAN HARGA SEWA (GROSS UP)')],
+        spkDokumen: data[i][idx('SPK (LINK DRIVE)')],
+        memoDokumen: data[i][idx('MEMO (LINK DRIVE)')],
+        namaPemilik: data[i][idx('NAMA PEMILIK')],
+        lokasiLama: data[i][idx('LOKASI LAMA')] || "-"
       });
     }
   }
@@ -376,30 +420,42 @@ function verifikasiDanAdjustMCX(kodeId, keputusan, nominalBaruFix, catatanMcx) {
 
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
+    var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+    var idx = function (headerName) { return getColIndex(colMap, headerName); };
     var data = sheet.getDataRange().getValues();
 
-    for (var i = 4; i < data.length; i++) {
-      if (data[i][0] === kodeId) {
+    for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+      if (data[i][idx('KODE ID')] === kodeId) {
+        var rowNum = i + 1;
+        // setValue pakai kolom 1-based, sedangkan idx() 0-based -- jadi +1.
+        var setCell = function (headerName, value) {
+          sheet.getRange(rowNum, idx(headerName) + 1).setValue(value);
+        };
 
         if (keputusan === "APPROVED") {
-          var hrgFix = parseFloat(String(nominalBaruFix).replace(/\./g, '')) || data[i][5];
-          var dipotongPajak = (Math.round(data[i][10]) === Math.round(data[i][5])) ? "Ya, dipotong" : "Tidak (Gross Up)";
+          var hargaPokokLama = data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')];
+          var grossUpLama = data[i][idx('PENILAIAN HARGA SEWA (GROSS UP)')];
+          var hrgFix = parseFloat(String(nominalBaruFix).replace(/\./g, '')) || hargaPokokLama;
+          var dipotongPajak = (Math.round(grossUpLama) === Math.round(hargaPokokLama)) ? "Ya, dipotong" : "Tidak (Gross Up)";
 
           var nominalPajak = Math.round(dipotongPajak.includes("Ya") ? (hrgFix * 0.10) : ((hrgFix / 0.9) * 0.10));
           var hargaSetelahPajak = Math.round(dipotongPajak.includes("Ya") ? (hrgFix - nominalPajak) : hrgFix);
           var nilaiGrossUp = Math.round(dipotongPajak.includes("Ya") ? hrgFix : (hrgFix / 0.9));
 
-          sheet.getRange(i + 1, 6).setValue(hrgFix);
-          sheet.getRange(i + 1, 7).setValue(nominalPajak);
-          sheet.getRange(i + 1, 8).setValue(hargaSetelahPajak);
-          sheet.getRange(i + 1, 11).setValue(nilaiGrossUp);
+          setCell('HARGA SEBELUM PAJAK (POKOK) SEWA', hrgFix);
+          setCell('PAJAK SEWA (YANG DIPOTONG)', nominalPajak);
+          setCell('HARGA SETELAH PAJAK (DITRANSFER BERSIH)', hargaSetelahPajak);
+          setCell('PENILAIAN HARGA SEWA (GROSS UP)', nilaiGrossUp);
 
-          sheet.getRange(i + 1, 26).setValue("APPROVED");
+          setCell('STATUS MCX', "APPROVED");
+          // Jejak waktu untuk NEW_KEU nanti. Kolom "TANGGAL ACC MCX" perlu
+          // ditambahkan manual di sheet NEW_INPUT kalau belum ada.
+          setCell('TANGGAL ACC MCX', new Date());
         } else {
-          sheet.getRange(i + 1, 26).setValue("REVISED");
+          setCell('STATUS MCX', "REVISED");
         }
 
-        sheet.getRange(i + 1, 27).setValue(catatanMcx || "-");
+        setCell('CATATAN MCX', catatanMcx || "-");
         return "Verifikasi MCX untuk ID " + kodeId + " berhasil disimpan dengan status: " + keputusan;
       }
     }
@@ -416,14 +472,17 @@ function getPengajuanSekretaris() {
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return { pendingList: [], countPending: 0, countApproved: 0, countRejected: 0 };
+
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var pendingList = [];
   var countApproved = 0, countRejected = 0;
 
-  for (var i = 4; i < data.length; i++) {
-    if (data[i][0] !== "") {
-      var statusMcx = String(data[i][25] || "").trim();
-      var statusCek = data[i][27];
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    if (data[i][idx('KODE ID')] !== "") {
+      var statusMcx = String(data[i][idx('STATUS MCX')] || "").trim();
+      var statusCek = data[i][idx('STATUS SEKRETARIS')];
 
       if (statusMcx === "APPROVED") {
         if (statusCek === true) {
@@ -431,13 +490,23 @@ function getPengajuanSekretaris() {
         } else if (statusCek === false) {
           countRejected++;
         } else {
+          var tglHabis = data[i][idx('TANGGAL HABIS KONTRAK')];
           pendingList.push({
-            kodeId: data[i][0], lokasi: data[i][2], statusSewa: data[i][3], pembayarPBB: data[i][4],
-            hargaPokok: data[i][5], pajak: data[i][6], hargaBersih: data[i][7], masaSewa: data[i][8],
-            tglHabisBaru: data[i][9] instanceof Date ? data[i][9].toISOString().split('T')[0] : data[i][9],
-            spkDokumen: data[i][18], memoDokumen: data[i][19],
-            statusCek: statusCek, catatan: data[i][28] || "-",
-            namaPemilik: data[i][38], lokasiLama: data[i][39] || "-"
+            kodeId: data[i][idx('KODE ID')],
+            lokasi: data[i][idx('LOKASI')],
+            statusSewa: data[i][idx('STATUS SEWA')],
+            pembayarPBB: data[i][idx('PIHAK PEMBAYAR PAJAK PBB')],
+            hargaPokok: data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+            pajak: data[i][idx('PAJAK SEWA (YANG DIPOTONG)')],
+            hargaBersih: data[i][idx('HARGA SETELAH PAJAK (DITRANSFER BERSIH)')],
+            masaSewa: data[i][idx('MASA SEWA (TAHUN)')],
+            tglHabisBaru: tglHabis instanceof Date ? tglHabis.toISOString().split('T')[0] : tglHabis,
+            spkDokumen: data[i][idx('SPK (LINK DRIVE)')],
+            memoDokumen: data[i][idx('MEMO (LINK DRIVE)')],
+            statusCek: statusCek,
+            catatan: data[i][idx('CATATAN SEKRETARIS')] || "-",
+            namaPemilik: data[i][idx('NAMA PEMILIK')],
+            lokasiLama: data[i][idx('LOKASI LAMA')] || "-"
           });
         }
       }
@@ -452,43 +521,66 @@ function getRiwayatSekretaris() {
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return [];
+
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var result = [];
 
-  for (var i = 4; i < data.length; i++) {
-    var statusMcx = String(data[i][25] || "").trim();
-    var statusCek = data[i][27];
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    var statusMcx = String(data[i][idx('STATUS MCX')] || "").trim();
+    var statusCek = data[i][idx('STATUS SEKRETARIS')];
 
-    if (data[i][0] !== "" && statusMcx === "APPROVED" && (statusCek === true || statusCek === false)) {
+    if (data[i][idx('KODE ID')] !== "" && statusMcx === "APPROVED" && (statusCek === true || statusCek === false)) {
+      var tglHabis = data[i][idx('TANGGAL HABIS KONTRAK')];
       result.push({
-        kodeId: data[i][0], lokasi: data[i][2], statusSewa: data[i][3], pembayarPBB: data[i][4],
-        hargaPokok: data[i][5], pajak: data[i][6], hargaBersih: data[i][7], masaSewa: data[i][8],
-        tglHabisBaru: data[i][9] instanceof Date ? data[i][9].toISOString().split('T')[0] : data[i][9],
-        spkDokumen: data[i][18], memoDokumen: data[i][19],
-        statusCek: statusCek, catatan: data[i][28] || "-"
+        kodeId: data[i][idx('KODE ID')],
+        lokasi: data[i][idx('LOKASI')],
+        statusSewa: data[i][idx('STATUS SEWA')],
+        pembayarPBB: data[i][idx('PIHAK PEMBAYAR PAJAK PBB')],
+        hargaPokok: data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+        pajak: data[i][idx('PAJAK SEWA (YANG DIPOTONG)')],
+        hargaBersih: data[i][idx('HARGA SETELAH PAJAK (DITRANSFER BERSIH)')],
+        masaSewa: data[i][idx('MASA SEWA (TAHUN)')],
+        tglHabisBaru: tglHabis instanceof Date ? tglHabis.toISOString().split('T')[0] : tglHabis,
+        spkDokumen: data[i][idx('SPK (LINK DRIVE)')],
+        memoDokumen: data[i][idx('MEMO (LINK DRIVE)')],
+        statusCek: statusCek,
+        catatan: data[i][idx('CATATAN SEKRETARIS')] || "-"
       });
     }
   }
   return result;
 }
 
+// FIX KEAMANAN: sebelumnya fungsi ini bisa dipanggil siapapun tanpa role-check.
+// Dicek pemakaiannya: hanya dipanggil dari DashboardSekretaris.html, jadi
+// role-check disamakan dengan fungsi Sekretaris lainnya.
 function getPengajuanSiapCetak() {
+  var roles = getUserDetails(Session.getActiveUser().getEmail()).roles;
+  if (!roles.includes("Sekretaris") && !roles.includes("Admin")) throw new Error("Akses Ditolak.");
+
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return [];
+
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var result = [];
 
-  for (var i = 4; i < data.length; i++) {
-    if (data[i][0] !== "" && data[i][29] === "Disetujui") {
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    if (data[i][idx('KODE ID')] !== "" && data[i][idx('STATUS DIREKTUR')] === "Disetujui") {
+      var spkVal = data[i][idx('SPK (LINK DRIVE)')];
+      var memoVal = data[i][idx('MEMO (LINK DRIVE)')];
       result.push({
-        kodeId: data[i][0],
-        lokasi: data[i][2],
-        statusSewa: data[i][3],
-        nilaiGrossUp: data[i][10] || data[i][5],
-        hargaBaru: data[i][5],
-        catatanDirektur: data[i][30] || "-",
-        memoUrl: data[i][19] ? data[i][19].split("|ID:")[0] : "-",
-        spkUrl: data[i][18] ? data[i][18].split("|ID:")[0] : "-"
+        kodeId: data[i][idx('KODE ID')],
+        lokasi: data[i][idx('LOKASI')],
+        statusSewa: data[i][idx('STATUS SEWA')],
+        nilaiGrossUp: data[i][idx('PENILAIAN HARGA SEWA (GROSS UP)')] || data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+        hargaBaru: data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+        catatanDirektur: data[i][idx('CATATAN DIREKTUR')] || "-",
+        memoUrl: memoVal ? memoVal.split("|ID:")[0] : "-",
+        spkUrl: spkVal ? spkVal.split("|ID:")[0] : "-"
       });
     }
   }
@@ -500,11 +592,20 @@ function verifikasiPengajuan(kodeId, statusKeputusan, catatanSekretaris) {
   if (!role.includes("Sekretaris") && !role.includes("Admin")) throw new Error("Akses Ditolak.");
   var lock = LockService.getScriptLock(); try { lock.waitLock(10000); } catch (e) { throw new Error("Sistem sibuk."); }
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT"); var data = sheet.getDataRange().getValues();
-    for (var i = 4; i < data.length; i++) {
-      if (data[i][0] === kodeId) {
-        sheet.getRange(i + 1, 28).setValue(statusKeputusan === "Setuju" ? true : false);
-        sheet.getRange(i + 1, 29).setValue(catatanSekretaris || "-");
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
+    var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+    var idx = function (headerName) { return getColIndex(colMap, headerName); };
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+      if (data[i][idx('KODE ID')] === kodeId) {
+        sheet.getRange(i + 1, idx('STATUS SEKRETARIS') + 1).setValue(statusKeputusan === "Setuju" ? true : false);
+        sheet.getRange(i + 1, idx('CATATAN SEKRETARIS') + 1).setValue(catatanSekretaris || "-");
+        if (statusKeputusan === "Setuju") {
+          // Jejak waktu untuk NEW_KEU nanti. Kolom "TANGGAL ACC SEKRETARIS"
+          // perlu ditambahkan manual di sheet NEW_INPUT kalau belum ada.
+          sheet.getRange(i + 1, idx('TANGGAL ACC SEKRETARIS') + 1).setValue(new Date());
+        }
         return "Berhasil memperbarui status pengajuan.";
       }
     } throw new Error("ID tidak ditemukan!");
@@ -516,32 +617,52 @@ function getPengajuanDirektur() {
   if (!roles.includes("Direktur") && !roles.includes("Admin")) throw new Error("Akses Ditolak.");
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
-  if (!sheet) return []; var data = sheet.getDataRange().getValues(); var result = [];
-  for (var i = 4; i < data.length; i++) {
-    if (data[i][0] !== "" && data[i][27] === true && (!data[i][29] || data[i][29] === "")) {
+  if (!sheet) return [];
+
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
+  var data = sheet.getDataRange().getValues();
+  var result = [];
+
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    var statusCek = data[i][idx('STATUS SEKRETARIS')];
+    var statusDirektur = data[i][idx('STATUS DIREKTUR')];
+    if (data[i][idx('KODE ID')] !== "" && statusCek === true && (!statusDirektur || statusDirektur === "")) {
+      var tglHabis = data[i][idx('TANGGAL HABIS KONTRAK')];
       result.push({
-        kodeId: data[i][0], lokasi: data[i][2], statusSewa: data[i][3], hargaPokok: data[i][5],
-        nilaiGrossUp: data[i][10], masaSewa: data[i][8], tglHabisBaru: data[i][9] instanceof Date ? data[i][9].toISOString().split('T')[0] : data[i][9],
-        spkDokumen: data[i][18], memoDokumen: data[i][19], catatanSekretaris: data[i][28] || "-",
-        namaPemilik: data[i][38], lokasiLama: data[i][39] || "-"
+        kodeId: data[i][idx('KODE ID')],
+        lokasi: data[i][idx('LOKASI')],
+        statusSewa: data[i][idx('STATUS SEWA')],
+        hargaPokok: data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+        nilaiGrossUp: data[i][idx('PENILAIAN HARGA SEWA (GROSS UP)')],
+        masaSewa: data[i][idx('MASA SEWA (TAHUN)')],
+        tglHabisBaru: tglHabis instanceof Date ? tglHabis.toISOString().split('T')[0] : tglHabis,
+        spkDokumen: data[i][idx('SPK (LINK DRIVE)')],
+        memoDokumen: data[i][idx('MEMO (LINK DRIVE)')],
+        catatanSekretaris: data[i][idx('CATATAN SEKRETARIS')] || "-",
+        namaPemilik: data[i][idx('NAMA PEMILIK')],
+        lokasiLama: data[i][idx('LOKASI LAMA')] || "-"
       });
     }
-  } return result;
+  }
+  return result;
 }
 
 function getExecutiveAnalytics() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return { totalPengajuan: 0, countPending: 0, totalNominalApproved: 0, totalNominalPending: 0 };
 
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var totalPengajuan = 0, countPending = 0;
   var totalApproved = 0, totalPending = 0;
 
-  for (var i = 4; i < data.length; i++) {
-    if (data[i][0] !== "" && data[i][37] === "FINAL") {
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    if (data[i][idx('KODE ID')] !== "" && data[i][idx('STATUS DRAF')] === "FINAL") {
       totalPengajuan++;
-      var gross = parseFloat(data[i][10]) || parseFloat(data[i][5]) || 0;
-      var statusDir = data[i][29];
+      var gross = parseFloat(data[i][idx('PENILAIAN HARGA SEWA (GROSS UP)')]) || parseFloat(data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')]) || 0;
+      var statusDir = data[i][idx('STATUS DIREKTUR')];
 
       if (statusDir === "Disetujui") {
         totalApproved += gross;
@@ -562,23 +683,32 @@ function getExecutiveAnalytics() {
 function getRiwayatDirektur() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return [];
+
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var result = [];
 
-  for (var i = 4; i < data.length; i++) {
-    if (data[i][0] !== "" && data[i][29] && data[i][29] !== "") {
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    var statusDir = data[i][idx('STATUS DIREKTUR')];
+    if (data[i][idx('KODE ID')] !== "" && statusDir && statusDir !== "") {
       result.push({
-        kodeId: data[i][0],
-        lokasi: data[i][2],
-        nilaiGrossUp: data[i][10] || data[i][5],
-        statusDirektur: data[i][29],
-        catatanDirektur: data[i][30] || "-"
+        kodeId: data[i][idx('KODE ID')],
+        lokasi: data[i][idx('LOKASI')],
+        nilaiGrossUp: data[i][idx('PENILAIAN HARGA SEWA (GROSS UP)')] || data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+        statusDirektur: statusDir,
+        catatanDirektur: data[i][idx('CATATAN DIREKTUR')] || "-"
       });
     }
   }
   return result;
 }
 
+// PERUBAHAN DESAIN (Opsi B, sesuai kesepakatan): fungsi ini SEBELUMNYA
+// langsung membuat baris parsial di NEW_KEU begitu Direktur approve.
+// Sekarang TIDAK LAGI -- baris NEW_KEU hanya dibuat lengkap sekali oleh
+// simpanDataKeuangan() saat Keuangan submit. Direktur di sini hanya
+// mengubah status di NEW_INPUT.
 function verifikasiDirektur(kodeId, statusKeputusan, catatanDirektur) {
   var roles = getUserDetails(Session.getActiveUser().getEmail()).roles;
   if (!roles.includes("Direktur") && !roles.includes("Admin")) throw new Error("Akses Ditolak.");
@@ -587,38 +717,28 @@ function verifikasiDirektur(kodeId, statusKeputusan, catatanDirektur) {
   try { lock.waitLock(10000); } catch (e) { throw new Error("Sistem sibuk."); }
 
   try {
-    checkAndPrepareSheets();
-
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheetInput = ss.getSheetByName("NEW_INPUT");
+    var colMap = getColIndexMapAuto(sheetInput, NEW_INPUT_HEADER_ROWS);
+    var idx = function (headerName) { return getColIndex(colMap, headerName); };
     var dataInput = sheetInput.getDataRange().getValues();
 
-    for (var i = 4; i < dataInput.length; i++) {
-      if (dataInput[i][0] === kodeId) {
-        sheetInput.getRange(i + 1, 30).setValue(statusKeputusan);
-        sheetInput.getRange(i + 1, 31).setValue(catatanDirektur || "-");
+    for (var i = NEW_INPUT_DATA_START_ROW; i < dataInput.length; i++) {
+      if (dataInput[i][idx('KODE ID')] === kodeId) {
+        sheetInput.getRange(i + 1, idx('STATUS DIREKTUR') + 1).setValue(statusKeputusan);
+        sheetInput.getRange(i + 1, idx('CATATAN DIREKTUR') + 1).setValue(catatanDirektur || "-");
 
         if (statusKeputusan === "Disetujui") {
-          var sheetKeu = ss.getSheetByName("NEW_KEU");
-          var dataKeu = sheetKeu.getDataRange().getValues();
-
-          var exists = false;
-          for (var j = 3; j < dataKeu.length; j++) {
-            if (dataKeu[j][0] === kodeId) { exists = true; break; }
-          }
-
-          if (!exists) {
-            var barisKeu = [
-              dataInput[i][0], dataInput[i][1], "", dataInput[i][2], dataInput[i][3],
-              dataInput[i][21], dataInput[i][23], dataInput[i][24], dataInput[i][5],
-              dataInput[i][6], dataInput[i][7], dataInput[i][9], dataInput[i][10],
-              dataInput[i][7], dataInput[i][6], "", "", "", dataInput[i][7],
-              "ADA", dataInput[i][18], "BELUM", "", "", "", "", ""
-            ];
-            sheetKeu.appendRow(barisKeu);
-          }
+          // Catat jejak waktu approval Direktur -- dipakai nanti oleh
+          // simpanDataKeuangan() untuk mengisi NEW_KEU secara lengkap.
+          // CATATAN: kolom "TANGGAL ACC DIREKTUR" perlu ditambahkan manual
+          // di sheet NEW_INPUT (paling gampang: taruh di kolom paling akhir,
+          // setelah EMAIL NEGOSIATOR). Kalau kolom ini belum ada, baris di
+          // bawah akan gagal dengan pesan error yang jelas -- bukan silent bug.
+          sheetInput.getRange(i + 1, idx('TANGGAL ACC DIREKTUR') + 1).setValue(new Date());
         }
-        return "Pengajuan berhasil " + statusKeputusan + " dan disalurkan ke Divisi Keuangan.";
+
+        return "Pengajuan berhasil " + statusKeputusan + ". Siap diproses oleh Divisi Keuangan.";
       }
     }
     throw new Error("ID Pengajuan tidak ditemukan!");
@@ -634,17 +754,30 @@ function getPengajuanKeuangan() {
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return [];
+
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var result = [];
 
-  for (var i = 4; i < data.length; i++) {
-    if (data[i][0] !== "" && data[i][29] === "Disetujui" && (!data[i][34] || data[i][34] === "")) {
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    var statusDir = data[i][idx('STATUS DIREKTUR')];
+    var ntpn = data[i][idx('NOMOR NTPN RESMI')];
+    if (data[i][idx('KODE ID')] !== "" && statusDir === "Disetujui" && (!ntpn || ntpn === "")) {
+      var tglHabis = data[i][idx('TANGGAL HABIS KONTRAK')];
       result.push({
-        kodeId: data[i][0], lokasi: data[i][2], statusSewa: data[i][3],
-        hargaPokok: data[i][5], nominalPajak: data[i][6], hargaBersih: data[i][7],
-        masaSewa: data[i][8], tglHabisBaru: data[i][9] instanceof Date ? data[i][9].toISOString().split('T')[0] : data[i][9],
-        nilaiGrossUp: data[i][10], spkDokumen: data[i][18], memoDokumen: data[i][19],
-        catatanDirektur: data[i][30] || "-"
+        kodeId: data[i][idx('KODE ID')],
+        lokasi: data[i][idx('LOKASI')],
+        statusSewa: data[i][idx('STATUS SEWA')],
+        hargaPokok: data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+        nominalPajak: data[i][idx('PAJAK SEWA (YANG DIPOTONG)')],
+        hargaBersih: data[i][idx('HARGA SETELAH PAJAK (DITRANSFER BERSIH)')],
+        masaSewa: data[i][idx('MASA SEWA (TAHUN)')],
+        tglHabisBaru: tglHabis instanceof Date ? tglHabis.toISOString().split('T')[0] : tglHabis,
+        nilaiGrossUp: data[i][idx('PENILAIAN HARGA SEWA (GROSS UP)')],
+        spkDokumen: data[i][idx('SPK (LINK DRIVE)')],
+        memoDokumen: data[i][idx('MEMO (LINK DRIVE)')],
+        catatanDirektur: data[i][idx('CATATAN DIREKTUR')] || "-"
       });
     }
   }
@@ -657,18 +790,23 @@ function getRiwayatKeuangan() {
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("NEW_INPUT");
   if (!sheet) return [];
+
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var result = [];
 
-  for (var i = 4; i < data.length; i++) {
-    if (data[i][0] !== "" && data[i][34] && String(data[i][34]).trim() !== "") {
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    var ntpn = data[i][idx('NOMOR NTPN RESMI')];
+    if (data[i][idx('KODE ID')] !== "" && ntpn && String(ntpn).trim() !== "") {
+      var tglBayar = data[i][idx('TANGGAL BAYAR PAJAK')];
       result.push({
-        kodeId: data[i][0],
-        lokasi: data[i][2],
-        nilaiGrossUp: data[i][10] || data[i][5],
-        tglBayarPajak: data[i][33] instanceof Date ? data[i][33].toISOString().split('T')[0] : (data[i][33] || "-"),
-        ntpn: data[i][34],
-        bukpotLink: data[i][36] || ""
+        kodeId: data[i][idx('KODE ID')],
+        lokasi: data[i][idx('LOKASI')],
+        nilaiGrossUp: data[i][idx('PENILAIAN HARGA SEWA (GROSS UP)')] || data[i][idx('HARGA SEBELUM PAJAK (POKOK) SEWA')],
+        tglBayarPajak: tglBayar instanceof Date ? tglBayar.toISOString().split('T')[0] : (tglBayar || "-"),
+        ntpn: ntpn,
+        bukpotLink: data[i][idx('BUKTI TRANSFER / BUKPOT')] || ""
       });
     }
   }
@@ -678,6 +816,16 @@ function getRiwayatKeuangan() {
 // ==========================================
 // BACKEND DIVISI KEUANGAN (NEW_KEU UPDATE)
 // ==========================================
+// Konstanta struktur sheet NEW_KEU: sama seperti NEW_INPUT, ada kolom
+// "Fix Nilai (Arsip) > Sewa Bersih / Pajak" yang berjenjang 3 baris,
+// plus 1 baris metadata nomor kolom sebelum data mulai.
+var NEW_KEU_HEADER_ROWS = 3;
+var NEW_KEU_DATA_START_ROW = 4;
+
+// PERUBAHAN DESAIN (Opsi B, sesuai kesepakatan): NEW_KEU sekarang HANYA
+// diisi lengkap sekali di sini, tidak lagi ada baris parsial dari Direktur.
+// Kalau untuk suatu alasan baris untuk kodeId ini SUDAH ada (misal koreksi
+// ulang oleh Keuangan), baris itu ditimpa lengkap -- bukan ditambah baris baru.
 function simpanDataKeuangan(data) {
   var roles = getUserDetails(Session.getActiveUser().getEmail()).roles;
   if (!roles.includes("Keuangan") && !roles.includes("Admin")) throw new Error("Akses Ditolak: Anda bukan tim Keuangan.");
@@ -692,11 +840,16 @@ function simpanDataKeuangan(data) {
     var sheetInput = ss.getSheetByName("NEW_INPUT");
     var sheetKeu = ss.getSheetByName("NEW_KEU");
 
+    var colMapInput = getColIndexMapAuto(sheetInput, NEW_INPUT_HEADER_ROWS);
+    var idxIn = function (headerName) { return getColIndex(colMapInput, headerName); };
+    var colMapKeu = getColIndexMapAuto(sheetKeu, NEW_KEU_HEADER_ROWS);
+    var idxKeu = function (headerName) { return getColIndex(colMapKeu, headerName); };
+
     var dataInput = sheetInput.getDataRange().getValues();
     var dataKeu = sheetKeu.getDataRange().getValues();
 
-    for (var i = 4; i < dataInput.length; i++) {
-      if (dataInput[i][0] === data.kodeId) {
+    for (var i = NEW_INPUT_DATA_START_ROW; i < dataInput.length; i++) {
+      if (dataInput[i][idxIn('KODE ID')] === data.kodeId) {
 
         // 1. Upload Bukti Potong jika ada
         var bukpotCellContent = "";
@@ -709,65 +862,68 @@ function simpanDataKeuangan(data) {
 
         var nilaiPajakRealNum = parseFloat(String(data.nilaiPajakReal || "0").replace(/\./g, '')) || 0;
         var hardcopyStatus = data.hardcopySPK ? "ADA" : "BELUM";
+        var tglCair = new Date();
 
-        // 2. Update status & pajak di Master NEW_INPUT (Kolom AG s/d AK)
-        sheetInput.getRange(i + 1, 33).setValue(hardcopyStatus);       // AG (32)
-        sheetInput.getRange(i + 1, 34).setValue(data.tglBayarPajak);  // AH (33)
-        sheetInput.getRange(i + 1, 35).setValue(data.ntpnPajak);     // AI (34)
-        sheetInput.getRange(i + 1, 36).setValue(nilaiPajakRealNum);  // AJ (35)
-        if (bukpotCellContent !== "") sheetInput.getRange(i + 1, 37).setValue(bukpotCellContent); // AK (36)
+        // 2. Update status & pajak di Master NEW_INPUT
+        sheetInput.getRange(i + 1, idxIn('HARDCOPY SPK (FISIK)') + 1).setValue(hardcopyStatus);
+        sheetInput.getRange(i + 1, idxIn('TANGGAL BAYAR PAJAK') + 1).setValue(data.tglBayarPajak);
+        sheetInput.getRange(i + 1, idxIn('NOMOR NTPN RESMI') + 1).setValue(data.ntpnPajak);
+        sheetInput.getRange(i + 1, idxIn('NILAI REAL PAJAK') + 1).setValue(nilaiPajakRealNum);
+        if (bukpotCellContent !== "") sheetInput.getRange(i + 1, idxIn('BUKTI TRANSFER / BUKPOT') + 1).setValue(bukpotCellContent);
 
-        // 3. Update / Isi Lengkap Baris NEW_KEU (26 Kolom A-Z)
+        // 3. Bangun baris NEW_KEU LENGKAP (Opsi B: satu-satunya penulis baris NEW_KEU)
+        var lastColKeu = sheetKeu.getLastColumn();
+        var barisKeu = new Array(lastColKeu).fill("");
+        var setKeu = function (headerName, value) { barisKeu[idxKeu(headerName)] = value; };
+
+        setKeu('KODE ID', dataInput[i][idxIn('KODE ID')]);
+        setKeu('PERIODE / TAHUN INPUT', dataInput[i][idxIn('PERIODE / TAHUN INPUT')]);
+        setKeu('LOKASI', dataInput[i][idxIn('LOKASI')]);
+        setKeu('STATUS SEWA', dataInput[i][idxIn('STATUS SEWA')]);
+        setKeu('INFORMASI SEWA SEBELUMNYA - TANGGAL HABIS KONTRAK', dataInput[i][idxIn('SEWA LAMA - TANGGAL HABIS KONTRAK')] || "");
+        setKeu('INFORMASI SEWA SEBELUMNYA - HARGA SETELAH PAJAK (DITRANSFER BERSIH)', dataInput[i][idxIn('SEWA LAMA - HARGA SETELAH PAJAK (NET)')] || 0);
+        setKeu('DEPOSIT', dataInput[i][idxIn('SEWA LAMA - DEPOSIT')] || 0);
+        setKeu('HARGA SEBELUM PAJAK (POKOK) SEWA', dataInput[i][idxIn('HARGA SEBELUM PAJAK (POKOK) SEWA')] || 0);
+        setKeu('PAJAK SEWA (YANG DIPOTONG)', dataInput[i][idxIn('PAJAK SEWA (YANG DIPOTONG)')] || 0);
+        setKeu('INFORMASI SEWA MENDATANG - HARGA SETELAH PAJAK (DITRANSFER BERSIH)', dataInput[i][idxIn('HARGA SETELAH PAJAK (DITRANSFER BERSIH)')] || 0);
+        setKeu('INFORMASI SEWA MENDATANG - TANGGAL HABIS KONTRAK', dataInput[i][idxIn('TANGGAL HABIS KONTRAK')] || "");
+        setKeu('PENILAIAN HARGA SEWA (GROSS UP)', dataInput[i][idxIn('PENILAIAN HARGA SEWA (GROSS UP)')] || 0);
+        setKeu('SEWA BERSIH', dataInput[i][idxIn('HARGA SETELAH PAJAK (DITRANSFER BERSIH)')] || 0);
+        setKeu('PAJAK', dataInput[i][idxIn('PAJAK SEWA (YANG DIPOTONG)')] || 0);
+        setKeu('NAMA', dataInput[i][idxIn('NAMA PEMILIK')] || "");
+        setKeu('NOMOR', dataInput[i][idxIn('NIK')] || "");
+        setKeu('NPWP', dataInput[i][idxIn('NPWP')] || "");
+        setKeu('SEWA DITRANSFER', dataInput[i][idxIn('HARGA SETELAH PAJAK (DITRANSFER BERSIH)')] || 0);
+        setKeu('SOFT', "ADA");
+        setKeu('LINK', dataInput[i][idxIn('SPK (LINK DRIVE)')] || "");
+        setKeu('HARD', hardcopyStatus);
+        setKeu('TANGGAL BAYAR', data.tglBayarPajak);
+        setKeu('NOMOR NTPN', data.ntpnPajak);
+        setKeu('NILAI PAJAK', nilaiPajakRealNum);
+        setKeu('ARSIP BUKPOT', bukpotCellContent);
+        setKeu('EMAIL NEGOSIATOR', dataInput[i][idxIn('EMAIL NEGOSIATOR')] || "");
+        // Kolom jejak waktu ini butuh kolom baru di NEW_INPUT (lihat catatan
+        // di verifikasiDanAdjustMCX / verifikasiPengajuan / verifikasiDirektur).
+        setKeu('TANGGAL ACC MCX', dataInput[i][idxIn('TANGGAL ACC MCX')] || "");
+        setKeu('TANGGAL ACC SEKRETARIS', dataInput[i][idxIn('TANGGAL ACC SEKRETARIS')] || "");
+        setKeu('TANGGAL ACC DIREKTUR', dataInput[i][idxIn('TANGGAL ACC DIREKTUR')] || "");
+        setKeu('TANGGAL CAIR', tglCair);
+
         var targetRowKeu = -1;
-        for (var k = 3; k < dataKeu.length; k++) {
-          if (dataKeu[k][0] === data.kodeId) {
-            targetRowKeu = k + 1;
-            break;
-          }
+        for (var k = NEW_KEU_DATA_START_ROW; k < dataKeu.length; k++) {
+          if (dataKeu[k][idxKeu('KODE ID')] === data.kodeId) { targetRowKeu = k + 1; break; }
         }
-
-        var barisKeuLengkap = [
-          dataInput[i][0],                             // A (1): NOMOR SPK
-          dataInput[i][1],                             // B (2): PERIODE / TAHUN INPUT
-          dataInput[i][2],                             // C (3): LOKASI
-          dataInput[i][3],                             // D (4): STATUS SEWA
-          dataInput[i][21] || "",                      // E (5): Tanggal Habis Kontrak Lama
-          dataInput[i][23] || 0,                       // F (6): Harga Sewa Lama Net
-          dataInput[i][24] || 0,                       // G (7): Deposit Lama
-          dataInput[i][5] || 0,                        // H (8): Harga Pokok Sewa Baru
-          dataInput[i][6] || 0,                        // I (9): Pajak Sewa (Dipotong)
-          dataInput[i][7] || 0,                        // J (10): Harga Net Ditransfer
-          dataInput[i][9] || "",                       // K (11): Tanggal Habis Kontrak Baru
-          dataInput[i][10] || 0,                       // L (12): Gross Up
-          dataInput[i][7] || 0,                        // M (13): Fix Sewa Bersih
-          dataInput[i][6] || 0,                        // N (14): Fix Pajak
-          dataInput[i][38] || "",                      // O (15): Nama Pemilik
-          "",                                          // P (16): Nomor NIK
-          "",                                          // Q (17): NPWP
-          dataInput[i][7] || 0,                        // R (18): Sewa Ditransfer
-          "ADA",                                       // S (19): Soft File SPK
-          dataInput[i][18] || "",                      // T (20): Link Soft SPK
-          hardcopyStatus,                              // U (21): Hardcopy SPK
-          "",                                          // V (22): Masa Pajak
-          data.tglBayarPajak,                          // W (23): Tanggal Bayar
-          data.ntpnPajak,                              // X (24): Nomor NTPN
-          nilaiPajakRealNum,                           // Y (25): Nilai Pajak Real
-          bukpotCellContent                            // Z (26): ARSIP BUKPOT
-        ];
 
         if (targetRowKeu !== -1) {
-          sheetKeu.getRange(targetRowKeu, 1, 1, barisKeuLengkap.length).setValues([barisKeuLengkap]);
+          sheetKeu.getRange(targetRowKeu, 1, 1, barisKeu.length).setValues([barisKeu]);
         } else {
-          sheetKeu.appendRow(barisKeuLengkap);
+          sheetKeu.appendRow(barisKeu);
         }
 
-        // 4. SINKRONISASI KE SHEET TERPISAH (NEW_REKAP)
-        syncKeRekap(data.kodeId);
+        // 4. Notifikasi Email Feedback
+        kirimEmailFeedbackPencairan(data.kodeId, dataInput[i][idxIn('LOKASI')], data.ntpnPajak, dataInput[i][idxIn('HARGA SETELAH PAJAK (DITRANSFER BERSIH)')]);
 
-        // 5. Notifikasi Email Feedback
-        kirimEmailFeedbackPencairan(data.kodeId, dataInput[i][2], data.ntpnPajak, dataInput[i][7]);
-
-        return "Pencairan dana berhasil dicatat di NEW_KEU dan disinkronkan ke NEW_REKAP.";
+        return "Pencairan dana berhasil dicatat lengkap di NEW_KEU.";
       }
     }
     throw new Error("ID Pengajuan tidak ditemukan!");
@@ -934,19 +1090,28 @@ function checkAndPrepareSheets() {
   var sheetKeu = ss.getSheetByName("NEW_KEU");
   if (!sheetKeu) {
     sheetKeu = ss.insertSheet("NEW_KEU");
-    var headerRow1 = ["PERIODE", "NOMOR SPK / TAHUN INPUT", "", "LOKASI", "STATUS SEWA", "INFORMASI SEWA SEBELUMNYA", "", "", "INFORMASI SEWA MENDATANG", "", "", "", "Fix Nilai (Arsip)", "", "NIK", "", "NPWP", "Sewa Ditransfer", "Arsip SPK", "", "", "", "INFO PAJAK", "", "", "", "ARSIP BUKPOT"];
-    var headerRow2 = ["", "", "", "", "", "Tanggal Habis Kontrak", "Harga Setelah Pajak (Ditransfer Bersih)", "Deposit", "Harga Sebelum Pajak (Pokok) Sewa", "Pajak Sewa (Yang dipotong)", "Harga Setelah Pajak (Ditransfer Bersih)", "Tanggal Habis Kontrak", "Penilaian Harga Sewa (Gross Up)", "Sewa Bersih", "Pajak", "Nama", "Nomor", "", "Soft", "Link", "Hard", "Masa Pajak", "Tanggal Bayar", "Nomor NTPN", "Nilai Pajak", ""];
-    sheetKeu.getRange(2, 1, 1, headerRow1.length).setValues([headerRow1]).setBackground("#dcfce7").setFontWeight("bold");
-    sheetKeu.getRange(3, 1, 1, headerRow2.length).setValues([headerRow2]).setBackground("#f1f5f9").setFontWeight("bold");
+    var headerRow1 = ["KODE ID", "PERIODE / TAHUN INPUT", "LOKASI", "STATUS SEWA", "INFORMASI SEWA SEBELUMNYA", "", "", "INFORMASI SEWA MENDATANG", "", "", "", "", "Fix Nilai (Arsip)", "", "N I K", "", "NPWP", "Sewa Ditransfer", "Arsip SPK", "", "", "INFO PAJAK", "", "", "", "ARSIP BUKPOT", "RENTANG WAKTU", "", "", "", ""];
+    var headerRow2 = ["", "", "", "", "Tanggal Habis Kontrak", "Harga Setelah Pajak (Ditransfer Bersih)", "Deposit", "Harga Sebelum Pajak (Pokok) Sewa", "Pajak Sewa (Yang dipotong)", "Harga Setelah Pajak (Ditransfer Bersih)", "Tanggal Habis Kontrak", "Penilaian Harga Sewa (Gross Up)", "Sewa Bersih", "Pajak", "Nama", "Nomor", "", "", "Soft", "Link", "Hard", "Masa Pajak", "Tanggal Bayar", "Nomor NTPN", "Nilai Pajak", "", "Email Negosiator", "Tanggal ACC MCX", "Tanggal ACC Sekretaris", "Tanggal ACC Direktur", "Tanggal Cair"];
+    sheetKeu.getRange(1, 1, 1, headerRow1.length).setValues([headerRow1]).setBackground("#dcfce7").setFontWeight("bold");
+    sheetKeu.getRange(2, 1, 1, headerRow2.length).setValues([headerRow2]).setBackground("#f1f5f9").setFontWeight("bold");
+    // Baris 3 dibiarkan kosong sebagai pemisah visual, data mulai baris 4
+    // (konsisten dengan NEW_KEU_HEADER_ROWS=3 / NEW_KEU_DATA_START_ROW=4).
   }
 
   var sheetRekap = ss.getSheetByName("NEW_REKAP");
   if (!sheetRekap) {
     sheetRekap = ss.insertSheet("NEW_REKAP");
-    var headerRekap = ["PERIODE", "WILAYAH / LOKASI", "STATUS SEWA", "INFORMASI SEWA SEBELUMNYA", "", "", "INFORMASI SEWA MENDATANG", "", "", "", "", "", "Pihak Pembayar Pajak PBB", "INFO REKENING BANK (Pemilik)", "Arsip SPK", "", "INFO PAJAK", ""];
-    var headerRekapSub = ["", "", "", "Tanggal Habis Kontrak", "Masa Sewa (tahun)", "Harga Setelah Pajak (Ditransfer Bersih)", "Harga Sebelum Pajak (Pokok) Sewa", "Pajak Sewa (Yang dipotong)", "Harga Setelah Pajak (Ditransfer Bersih)", "Masa Sewa (tahun)", "Tanggal Habis Kontrak", "", "", "", "Soft", "Hard", "Nomor NTPN", "Nilai Pajak"];
-    sheetRekap.getRange(4, 1, 1, headerRekap.length).setValues([headerRekap]).setBackground("#2e1065").setFontColor("#ffffff").setFontWeight("bold");
-    sheetRekap.getRange(5, 1, 1, headerRekapSub.length).setValues([headerRekapSub]).setBackground("#f1f5f9").setFontWeight("bold");
+    // FIX: skema lama tidak punya KODE ID sama sekali (tidak bisa trace
+    // balik ke transaksi asli). Ditambahkan sebagai kolom pertama.
+    var headerRekap = ["KODE ID", "PERIODE", "WILAYAH / LOKASI", "STATUS SEWA", "INFORMASI SEWA SEBELUMNYA", "", "INFORMASI SEWA MENDATANG", "", "", "", "", "Pihak Pembayar Pajak PBB", "INFO REKENING BANK (Pemilik)", "Arsip SPK", "", "INFO PAJAK", ""];
+    var headerRekapSub = ["", "", "", "", "Tanggal Habis Kontrak", "Masa Sewa (tahun)", "Harga Sebelum Pajak (Pokok) Sewa", "Pajak Sewa (Yang dipotong)", "Harga Setelah Pajak (Ditransfer Bersih)", "Masa Sewa (tahun)", "Tanggal Habis Kontrak", "", "", "", "Soft", "Hard", "Nomor NTPN", "Nilai Pajak"];
+    sheetRekap.getRange(1, 1, 1, headerRekap.length).setValues([headerRekap]).setBackground("#2e1065").setFontColor("#ffffff").setFontWeight("bold");
+    sheetRekap.getRange(2, 1, 1, headerRekapSub.length).setValues([headerRekapSub]).setBackground("#f1f5f9").setFontWeight("bold");
+    // CATATAN: baris header di sini sengaja dipindah ke baris 1-2 (bukan 4-5
+    // seperti versi lama) supaya konsisten dengan rebuildNewRekap() yang akan
+    // ditulis di sesi berikutnya. Sheet NEW_REKAP produksi kamu yang sudah
+    // ada TIDAK terpengaruh oleh perubahan ini -- fungsi ini hanya jalan
+    // kalau sheet belum ada sama sekali.
   }
 }
 
@@ -1051,18 +1216,20 @@ function cekJatuhTempoKontrak() {
   var sheet = ss.getSheetByName("NEW_INPUT");
   if (!sheet) return "Sheet NEW_INPUT tidak ditemukan.";
 
+  var colMap = getColIndexMapAuto(sheet, NEW_INPUT_HEADER_ROWS);
+  var idx = function (headerName) { return getColIndex(colMap, headerName); };
   var data = sheet.getDataRange().getValues();
   var today = new Date();
   today.setHours(0, 0, 0, 0);
 
   var terkirimCount = 0;
 
-  for (var i = 4; i < data.length; i++) {
-    var kodeId = data[i][0];
-    var lokasi = data[i][2];
-    var statusDraft = String(data[i][37] || "").trim();
-    var tglHabisRaw = data[i][9];
-    var emailNegosiator = String(data[i][40] || "").trim();
+  for (var i = NEW_INPUT_DATA_START_ROW; i < data.length; i++) {
+    var kodeId = data[i][idx('KODE ID')];
+    var lokasi = data[i][idx('LOKASI')];
+    var statusDraft = String(data[i][idx('STATUS DRAF')] || "").trim();
+    var tglHabisRaw = data[i][idx('TANGGAL HABIS KONTRAK')];
+    var emailNegosiator = String(data[i][idx('EMAIL NEGOSIATOR')] || "").trim();
 
     if (kodeId !== "" && statusDraft === "FINAL" && tglHabisRaw) {
       try {
@@ -1119,10 +1286,12 @@ function updateStatusHardcopySPK(kodeId, statusHardcopy) {
   try {
     var sheetInput = ss.getSheetByName("NEW_INPUT");
     if (sheetInput) {
+      var colMapIn = getColIndexMapAuto(sheetInput, NEW_INPUT_HEADER_ROWS);
       var dataInput = sheetInput.getDataRange().getValues();
-      for (var i = 4; i < dataInput.length; i++) {
-        if (dataInput[i][0] === kodeId) {
-          sheetInput.getRange(i + 1, 33).setValue(statusHardcopy);
+      var kodeIdColIn = getColIndex(colMapIn, 'KODE ID');
+      for (var i = NEW_INPUT_DATA_START_ROW; i < dataInput.length; i++) {
+        if (dataInput[i][kodeIdColIn] === kodeId) {
+          sheetInput.getRange(i + 1, getColIndex(colMapIn, 'HARDCOPY SPK (FISIK)') + 1).setValue(statusHardcopy);
           break;
         }
       }
@@ -1130,10 +1299,12 @@ function updateStatusHardcopySPK(kodeId, statusHardcopy) {
 
     var sheetKeu = ss.getSheetByName("NEW_KEU");
     if (sheetKeu) {
+      var colMapKeu = getColIndexMapAuto(sheetKeu, NEW_KEU_HEADER_ROWS);
       var dataKeu = sheetKeu.getDataRange().getValues();
-      for (var j = 3; j < dataKeu.length; j++) {
-        if (dataKeu[j][0] === kodeId) {
-          sheetKeu.getRange(j + 1, 21).setValue(statusHardcopy);
+      var kodeIdColKeu = getColIndex(colMapKeu, 'KODE ID');
+      for (var j = NEW_KEU_DATA_START_ROW; j < dataKeu.length; j++) {
+        if (dataKeu[j][kodeIdColKeu] === kodeId) {
+          sheetKeu.getRange(j + 1, getColIndex(colMapKeu, 'HARD') + 1).setValue(statusHardcopy);
           break;
         }
       }
@@ -1167,12 +1338,15 @@ function kirimEmailFeedbackPencairan(kodeId, lokasi, ntpn, nominalNet) {
     var sheetInput = ss.getSheetByName("NEW_INPUT");
     if (!sheetInput) return;
 
+    var colMap = getColIndexMapAuto(sheetInput, NEW_INPUT_HEADER_ROWS);
     var dataInput = sheetInput.getDataRange().getValues();
     var emailNegosiator = "";
+    var kodeIdCol = getColIndex(colMap, 'KODE ID');
+    var emailCol = getColIndex(colMap, 'EMAIL NEGOSIATOR');
 
-    for (var i = 4; i < dataInput.length; i++) {
-      if (dataInput[i][0] === kodeId) {
-        emailNegosiator = String(dataInput[i][40] || "").trim();
+    for (var i = NEW_INPUT_DATA_START_ROW; i < dataInput.length; i++) {
+      if (dataInput[i][kodeIdCol] === kodeId) {
+        emailNegosiator = String(dataInput[i][emailCol] || "").trim();
         break;
       }
     }

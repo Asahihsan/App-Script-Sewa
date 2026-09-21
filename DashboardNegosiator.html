@@ -96,6 +96,17 @@
             </div>
 
             <div class="grid-2">
+              <div>
+                <label>NIK Pemilik</label>
+                <input type="text" id="inputNIK" placeholder="16 digit NIK sesuai KTP" maxlength="16" inputmode="numeric">
+              </div>
+              <div>
+                <label>NPWP Pemilik</label>
+                <input type="text" id="inputNPWP" placeholder="Contoh: 12.345.678.9-012.000">
+              </div>
+            </div>
+
+            <div class="grid-2">
               <div><label>Harga Sewa Lama</label><input type="text" id="hargaLama" placeholder="0" class="rupiah"></div>
               <div><label>Masa Sewa Lama (Tahun)</label><input type="number" id="masaSewaLama" placeholder="1" min="1" oninput="validasiMasaSewa(this)"></div>
             </div>
@@ -437,6 +448,8 @@
         statusSewa: statusSewa,
         lokasiLama: lokasiLama,
         namaPemilik: namaPemilik,
+        nik: document.getElementById('inputNIK').value,
+        npwp: document.getElementById('inputNPWP').value,
         hargaBaru: hargaBaru,
         dipotongPajak: document.getElementById('pajak').value,
         pembayarPBB: document.getElementById('pembayarPBB').value,
@@ -498,6 +511,8 @@
       document.getElementById('inputLokasi').value = "";
       document.getElementById('hargaBaru').value = "";
       document.getElementById('inputNamaPemilik').value = "";
+      document.getElementById('inputNIK').value = "";
+      document.getElementById('inputNPWP').value = "";
       document.getElementById('tglMulaiBaru').value = "";
       document.getElementById('tglAkhirBaru').value = "";
       document.getElementById('depositBaru').value = "";
@@ -515,7 +530,11 @@
     }
 
     function loadRiwayat() {
-      google.script.run.withSuccessHandler(function(list) {
+      var tbody = document.getElementById('tabelRiwayat');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Memuat data... ⏳</td></tr>';
+
+      google.script.run
+        .withSuccessHandler(function(list) {
         var tbody = document.getElementById('tabelRiwayat');
         if(!tbody) return;
         if(list.length === 0) {
@@ -552,7 +571,15 @@
             '</tr>';
         });
         tbody.innerHTML = html;
-      }).getRiwayatPengajuan();
+        })
+        .withFailureHandler(function(err) {
+          var tbody = document.getElementById('tabelRiwayat');
+          if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#dc2626; font-weight:bold;">⚠️ Gagal memuat riwayat: ' + err.message + '</td></tr>';
+          }
+          Swal.fire({ icon: 'error', title: 'Gagal Memuat Riwayat', text: err.message });
+        })
+        .getRiwayatPengajuan();
     }
 
     // FIX LENGKAP: POPULASI SEMUA ELEMEN SAAT EDIT DRAF / REVISI
@@ -570,6 +597,8 @@
         document.getElementById('inputLokasi').value = data.lokasi || "";
         document.getElementById('statusSewa').value = data.statusSewa || "Kontrak Baru";
         document.getElementById('inputNamaPemilik').value = data.namaPemilik || "";
+        document.getElementById('inputNIK').value = data.nik || "";
+        document.getElementById('inputNPWP').value = data.npwp || "";
         if(data.lokasiLama) document.getElementById('inputLokasiLama').value = data.lokasiLama;
 
         document.getElementById('hargaLama').value = data.hargaLama ? parseFloat(data.hargaLama).toLocaleString('id-ID') : "";

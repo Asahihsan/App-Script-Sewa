@@ -118,6 +118,9 @@
           renderTabelUser(res.listUser);
           renderTabelLokasi(res.listLokasi);
         })
+        .withFailureHandler(function(err) {
+          Swal.fire({ icon: 'error', title: 'Gagal Memuat Data Master', text: err.message });
+        })
         .getAdminMasterData();
     }
 

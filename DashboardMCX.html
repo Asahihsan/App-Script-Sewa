@@ -112,6 +112,9 @@
     window.onload = function() { loadDataMCX(); };
 
     function loadDataMCX() {
+      var tbody = document.getElementById('tabelMCX');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Memuat antrean verifikasi MCX... ⏳</td></tr>';
+
       google.script.run.withSuccessHandler(function(list) {
         globalDataMCX = list;
         var tbody = document.getElementById('tabelMCX');
@@ -131,6 +134,10 @@
             '</tr>';
         });
         tbody.innerHTML = html;
+      }).withFailureHandler(function(err) {
+        var tbody = document.getElementById('tabelMCX');
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#dc2626; font-weight:bold;">⚠️ Gagal memuat data: ' + err.message + '</td></tr>';
+        Swal.fire({ icon: 'error', title: 'Gagal Memuat Data', text: err.message });
       }).getPengajuanMCX();
     }
 
