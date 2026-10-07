@@ -8,8 +8,10 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     :root { --primary: #2563eb; --bg-color: #f8fafc; --text-main: #0f172a; --text-muted: #64748b; --border-color: #e2e8f0; }
+    html, body { height: 100%; }
+
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; display: flex; height: 100vh; overflow: hidden; }
-    .sidebar { width: 260px; background: #0f172a; color: white; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+    .sidebar { width: 260px; height: 100%; flex-shrink: 0; box-sizing: border-box; background: #0f172a; color: white; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
     .brand { font-size: 18px; font-weight: bold; color: #38bdf8; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
     .menu-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
     .menu-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; font-weight: 500; color: #94a3b8; margin-bottom: 5px; transition: all 0.2s; }
@@ -112,9 +114,6 @@
     window.onload = function() { loadDataMCX(); };
 
     function loadDataMCX() {
-      var tbody = document.getElementById('tabelMCX');
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Memuat antrean verifikasi MCX... ⏳</td></tr>';
-
       google.script.run.withSuccessHandler(function(list) {
         globalDataMCX = list;
         var tbody = document.getElementById('tabelMCX');
@@ -134,10 +133,6 @@
             '</tr>';
         });
         tbody.innerHTML = html;
-      }).withFailureHandler(function(err) {
-        var tbody = document.getElementById('tabelMCX');
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#dc2626; font-weight:bold;">⚠️ Gagal memuat data: ' + err.message + '</td></tr>';
-        Swal.fire({ icon: 'error', title: 'Gagal Memuat Data', text: err.message });
       }).getPengajuanMCX();
     }
 

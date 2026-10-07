@@ -151,8 +151,12 @@ function getColIndexMapAuto(sheet, maxHeaderRows, startRow) {
   // ini menggantikan tebakan forward-fill dengan fakta asli dari sheet,
   // jadi kolom tunggal yang "nyempil" di antara grup (misal karena mereka
   // di-merge vertikal 2-3 baris) terbaca benar tanpa perlu ditebak.
+  // mergeId dipakai supaya saat cari "nama induk", baris yang cuma bayangan
+  // merge YANG SAMA tidak dianggap sebagai induk terpisah (bug: field yang
+  // di-merge vertikal 2 baris salah dikira "induk dari dirinya sendiri").
   var merges = range.getMergedRanges();
-  merges.forEach(function (m) {
+  var mergeId = grid.map(function (row) { return row.map(function () { return null; }); });
+  merges.forEach(function (m, mIdx) {
     var mRow0 = m.getRow() - startRow;       // baris pertama merge, relatif window
     var mRow1 = m.getLastRow() - startRow;   // baris terakhir merge, relatif window
     var mCol0 = m.getColumn() - 1;           // kolom pertama merge, 0-based
@@ -161,13 +165,15 @@ function getColIndexMapAuto(sheet, maxHeaderRows, startRow) {
     for (var rr = Math.max(0, mRow0); rr <= Math.min(maxHeaderRows - 1, mRow1); rr++) {
       for (var cc = Math.max(0, mCol0); cc <= Math.min(lastCol - 1, mCol1); cc++) {
         grid[rr][cc] = val;
+        mergeId[rr][cc] = mIdx;
       }
     }
   });
 
   // Tentukan "deepest label" per kolom: nilai paling detail (baris paling
   // bawah yang terisi), dan nama induk = nilai non-kosong terdekat di atas
-  // baris itu (melompati baris yang genuinely kosong di antaranya).
+  // baris itu, MELOMPATI baris yang genuinely kosong ATAU yang cuma bayangan
+  // merge yang sama dengan deepest (bukan induk sungguhan).
   var deepest = [];
   var deepestParent = [];
   for (var c = 0; c < lastCol; c++) {
@@ -181,8 +187,10 @@ function getColIndexMapAuto(sheet, maxHeaderRows, startRow) {
     }
     deepest.push(chosen);
 
+    var chosenMergeId = chosenRow >= 0 ? mergeId[chosenRow][c] : null;
     var parentName = '';
     for (var pr = chosenRow - 1; pr >= 0; pr--) {
+      if (chosenMergeId !== null && mergeId[pr][c] === chosenMergeId) continue; // masih bayangan merge yang sama, lewati
       if (grid[pr][c] !== '' && grid[pr][c] !== null && grid[pr][c] !== undefined) {
         parentName = normalizeHeaderName(grid[pr][c]);
         break;
@@ -212,7 +220,8 @@ function getColIndexMapAuto(sheet, maxHeaderRows, startRow) {
       }
     }
     if (map.hasOwnProperty(finalKey)) {
-      unresolvedDuplicates.push(finalKey + ' (kolom ke-' + (c4 + 1) + ', bentrok dengan kolom lain)');
+      unresolvedDuplicates.push(finalKey + ' (kolom ke-' + (c4 + 1) + ', bentrok dengan kolom ke-' + (map[finalKey] + 1) + ')');
+      continue; // JANGAN timpa entri pertama -- biar tidak hilang diam-diam
     }
     map[finalKey] = c4;
   }
@@ -223,6 +232,45 @@ function getColIndexMapAuto(sheet, maxHeaderRows, startRow) {
   }
 
   return map;
+}
+
+/**
+ * Dump MENTAH isi header (sebelum diolah sama sekali) plus daftar merge cell
+ * yang ditemukan -- dipakai untuk diagnosis manual kalau getColIndexMapAuto
+ * memberi hasil yang aneh/tidak terduga.
+ *
+ * @param {string} sheetName
+ * @param {number} numRows - jumlah baris yang mau di-dump
+ * @param {number} startRow - baris pertama (1-based), default 1
+ */
+function debugRawHeaderGrid(sheetName, numRows, startRow) {
+  var sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  if (!sheet) { Logger.log('Sheet "' + sheetName + '" tidak ditemukan.'); return; }
+  startRow = startRow || 1;
+  var lastCol = sheet.getLastColumn();
+  var range = sheet.getRange(startRow, 1, numRows, lastCol);
+  var grid = range.getValues();
+
+  var lines = [];
+  for (var r = 0; r < grid.length; r++) {
+    var rowLine = 'Baris sheet ke-' + (startRow + r) + ': ';
+    var cells = [];
+    for (var c = 0; c < grid[r].length; c++) {
+      var v = grid[r][c];
+      cells.push('[' + (c + 1) + ']=' + (v === '' ? '(kosong)' : '"' + v + '"'));
+    }
+    lines.push(rowLine + cells.join(' | '));
+  }
+
+  var merges = range.getMergedRanges();
+  var mergeLines = merges.map(function (m) {
+    return 'Merge: baris ' + m.getRow() + '-' + m.getLastRow() + ', kolom ' + m.getColumn() + '-' + m.getLastColumn() +
+      ' (nilai: "' + sheet.getRange(m.getRow(), m.getColumn()).getValue() + '")';
+  });
+
+  Logger.log('=== RAW DUMP "' + sheetName + '" baris ' + startRow + '-' + (startRow + numRows - 1) + ' ===\n' +
+    lines.join('\n') + '\n\n--- MERGE CELLS DI AREA INI ---\n' +
+    (mergeLines.length ? mergeLines.join('\n') : '(tidak ada merge cell di area ini)'));
 }
 
 /**
@@ -276,6 +324,10 @@ function tesHelperRekap() {
   debugColIndexMapAuto('NEW_REKAP', 3, 3);
 }
 
-function tesHelperInputUlang() {
+function tesUlangInput() {
   debugColIndexMapAuto('NEW_INPUT', 3);
+}
+
+function tesUlangKeu() {
+  debugColIndexMapAuto('NEW_KEU', 3);
 }

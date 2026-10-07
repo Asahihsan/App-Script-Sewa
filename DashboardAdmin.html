@@ -9,8 +9,10 @@
 
   <style>
     :root { --primary: #0f172a; --bg-color: #f8fafc; --text-main: #0f172a; --text-muted: #64748b; --border-color: #e2e8f0; }
+    html, body { height: 100%; }
+
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; display: flex; height: 100vh; overflow: hidden; }
-    .sidebar { width: 260px; background: white; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+    .sidebar { width: 260px; height: 100%; flex-shrink: 0; box-sizing: border-box; background: white; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
     .brand { font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
     .menu-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
     .menu-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; transition: all 0.2s; }
@@ -117,9 +119,6 @@
           masterLokasi = res.listLokasi;
           renderTabelUser(res.listUser);
           renderTabelLokasi(res.listLokasi);
-        })
-        .withFailureHandler(function(err) {
-          Swal.fire({ icon: 'error', title: 'Gagal Memuat Data Master', text: err.message });
         })
         .getAdminMasterData();
     }

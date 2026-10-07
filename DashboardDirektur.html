@@ -8,8 +8,10 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     :root { --primary: #4f46e5; --primary-hover: #4338ca; --bg-color: #f8fafc; --text-main: #0f172a; --text-muted: #64748b; --border-color: #e2e8f0; }
+    html, body { height: 100%; }
+
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; display: flex; height: 100vh; overflow: hidden; }
-    .sidebar { width: 260px; background: #1e1b4b; color: white; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+    .sidebar { width: 260px; height: 100%; flex-shrink: 0; box-sizing: border-box; background: #1e1b4b; color: white; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
     .brand { font-size: 18px; font-weight: bold; color: #818cf8; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
     .menu-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
     .menu-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; font-weight: 500; color: #c7d2fe; margin-bottom: 5px; transition: all 0.2s; }
@@ -120,22 +122,50 @@
 
   <div class="modal-overlay" id="modalDirektur">
     <div class="modal-content">
-      <h3 style="margin-top: 0; color: var(--primary);">Executive Review Pengajuan</h3>
+      <h3 id="modalJudul" style="margin-top: 0; color: var(--primary);">Executive Review Pengajuan</h3>
       <p id="modalKodeId" style="font-weight: bold; font-size: 14px; color: var(--text-muted); margin-top: -10px;"></p>
-      <div class="modal-grid">
+
+      <!-- Box khusus pencairan Cicilan lanjutan (2/3): deal sudah ACC, di sini -->
+      <!-- Direktur cuma perlu konfirmasi transfer tahap ini. -->
+      <div id="boxCicilanInfo" style="display:none; background:#fffbeb; border:1px solid #fde68a; padding:14px; border-radius:8px; margin-bottom:15px;">
+        <p style="margin:0; font-size:13px; color:#92400e;"><b>⏳ Pencairan Cicilan ke-<span id="mCicilanKe"></span></b></p>
+        <p style="margin:6px 0 0 0; font-size:20px; font-weight:bold; color:#059669;" id="mJumlahCicilan"></p>
+        <p style="margin:4px 0 0 0; font-size:12px; color:#92400e;">Jatuh tempo: <span id="mTglJatuhTempo"></span></p>
+      </div>
+
+      <div class="modal-grid" id="boxDealInfo">
         <div><b>Lokasi NF:</b> <span id="mLokasi"></span></div>
         <div><b>Status Sewa:</b> <span id="mStatusSewa"></span></div>
         <div><b>Harga Sewa Pokok:</b> <span id="mHargaPokok"></span></div>
         <div><b>Nilai Final (Gross):</b> <span id="mHargaBersih" style="color:#059669; font-weight:bold;"></span></div>
       </div>
-      <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+      <div id="boxCatatanSekretaris" style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
         <p style="margin: 0; font-size: 12px; color: var(--text-muted);"><b>Catatan Verifikasi Sekretaris:</b></p>
         <p id="mCatatanSekretaris" style="margin: 5px 0 0 0; font-size: 13px; font-style: italic;"></p>
       </div>
+
+      <!-- Bukti kirim/transfer -- Direktur yang acc sekaligus transfer dananya,
+           jadi bukti transfer dilampirkan di sini untuk memudahkan pencatatan
+           Keuangan nantinya. -->
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+        <label style="font-weight: bold; font-size: 12px; color: #1e40af;">📎 Upload Bukti Transfer (opsional, disarankan diisi):</label>
+        <input type="file" id="inputBuktiTransfer" accept="image/*,.pdf" style="width:100%; margin-top:6px; font-size:12px;">
+      </div>
+
+      <div id="boxCatatanDirektur" style="margin-bottom: 15px;">
+        <label style="font-weight: bold; font-size: 12px;">Catatan Direktur (opsional):</label>
+        <input type="text" id="inputCatatanDirektur" placeholder="Catatan approval..." style="width:100%; padding:8px; border:1px solid var(--border-color); border-radius:6px; box-sizing:border-box; font-size:13px; margin-top:4px;">
+      </div>
+
       <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 25px;">
         <button onclick="tutupModal()" style="background: #cbd5e1; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">Tutup</button>
-        <button onclick="approvalDirektur('Tolak')" style="background: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">❌ Tolak</button>
-        <button onclick="approvalDirektur('Disetujui')" style="background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">✒️ Setujui & ACC</button>
+        <span id="aksiDealBaru">
+          <button onclick="approvalDirektur('Tolak')" style="background: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">❌ Tolak</button>
+          <button onclick="approvalDirektur('Disetujui')" style="background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">✒️ Setujui, ACC & Transfer</button>
+        </span>
+        <span id="aksiCicilan" style="display:none;">
+          <button onclick="prosesTransferCicilan()" style="background: #059669; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">💸 Tandai Sudah Ditransfer</button>
+        </span>
       </div>
     </div>
   </div>
@@ -163,67 +193,92 @@
     }
 
     function refreshExecutiveData() {
-      google.script.run
-        .withSuccessHandler(function(res) {
-          document.getElementById('kpiTotalCount').innerText = res.totalPengajuan;
-          document.getElementById('kpiPendingCount').innerText = res.countPending;
-          document.getElementById('kpiApprovedBudget').innerText = "Rp " + Math.round(res.totalNominalApproved).toLocaleString('id-ID');
-          document.getElementById('kpiPendingBudget').innerText = "Rp " + Math.round(res.totalNominalPending).toLocaleString('id-ID');
-        })
-        .withFailureHandler(function(err) {
-          Swal.fire({ icon: 'error', title: 'Gagal Memuat Statistik', text: err.message });
-        })
-        .getExecutiveAnalytics();
+      google.script.run.withSuccessHandler(function(res) {
+        document.getElementById('kpiTotalCount').innerText = res.totalPengajuan;
+        document.getElementById('kpiPendingCount').innerText = res.countPending;
+        document.getElementById('kpiApprovedBudget').innerText = "Rp " + Math.round(res.totalNominalApproved).toLocaleString('id-ID');
+        document.getElementById('kpiPendingBudget').innerText = "Rp " + Math.round(res.totalNominalPending).toLocaleString('id-ID');
+      }).getExecutiveAnalytics();
       loadDataDirektur();
     }
 
     function loadDataDirektur() {
-      var tbody = document.getElementById('tabelDirektur');
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Memuat data... ⏳</td></tr>';
-
-      google.script.run
-        .withSuccessHandler(function(list) {
-          globalData = list;
-          var tbody = document.getElementById('tabelDirektur');
-          if (list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Inbox Bersih! Tidak ada antrean pengajuan.</td></tr>';
-            return;
-          }
-          var html = '';
-          list.forEach(function(item, idx) {
-            html += '<tr>' +
-              '<td><b>' + item.kodeId + '</b></td>' +
-              '<td>' + item.lokasi + '</td>' +
-              '<td>' + item.statusSewa + '</td>' +
-              '<td><b style="color:#059669;">Rp ' + Math.round(item.nilaiGrossUp || item.hargaPokok).toLocaleString('id-ID') + '</b></td>' +
-              '<td>' + item.catatanSekretaris + '</td>' +
-              '<td><button class="btn-action" onclick="bukaModal(' + idx + ')">🔍 Review & ACC</button></td>' +
-              '</tr>';
-          });
-          tbody.innerHTML = html;
-        })
-        .withFailureHandler(function(err) {
-          var tbody = document.getElementById('tabelDirektur');
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#dc2626; font-weight:bold;">⚠️ Gagal memuat data: ' + err.message + '</td></tr>';
-          Swal.fire({ icon: 'error', title: 'Gagal Memuat Data', text: err.message });
-        })
-        .getPengajuanDirektur();
+      google.script.run.withSuccessHandler(function(list) {
+        globalData = list;
+        var tbody = document.getElementById('tabelDirektur');
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Inbox Bersih! Tidak ada antrean pengajuan.</td></tr>';
+          return;
+        }
+        var html = '';
+        list.forEach(function(item, idx) {
+          var isCicilan = item.tipePengajuan === 'CICILAN_LANJUTAN';
+          var labelAksi = isCicilan ? ('💸 Proses Cicilan ke-' + item.cicilanKe) : '🔍 Review & ACC';
+          var labelNilai = isCicilan
+            ? '<b style="color:#d97706;">Rp ' + Math.round(item.jumlahCicilan || 0).toLocaleString('id-ID') + ' (Cicilan ' + item.cicilanKe + ')</b>'
+            : '<b style="color:#059669;">Rp ' + Math.round(item.nilaiGrossUp || item.hargaPokok || 0).toLocaleString('id-ID') + '</b>';
+          html += '<tr>' +
+            '<td><b>' + item.kodeId + '</b></td>' +
+            '<td>' + item.lokasi + '</td>' +
+            '<td>' + item.statusSewa + '</td>' +
+            '<td>' + labelNilai + '</td>' +
+            '<td>' + (item.catatanSekretaris || '-') + '</td>' +
+            '<td><button class="btn-action" onclick="bukaModal(' + idx + ')">' + labelAksi + '</button></td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+      }).getPengajuanDirektur();
     }
 
     function bukaModal(idx) {
       selectedItem = globalData[idx];
       document.getElementById('modalKodeId').innerText = "KODE ID: " + selectedItem.kodeId;
-      document.getElementById('mLokasi').innerText = selectedItem.lokasi;
-      document.getElementById('mStatusSewa').innerText = selectedItem.statusSewa;
-      document.getElementById('mHargaPokok').innerText = "Rp " + Math.round(selectedItem.hargaPokok || 0).toLocaleString('id-ID');
-      document.getElementById('mHargaBersih').innerText = "Rp " + Math.round(selectedItem.nilaiGrossUp || selectedItem.hargaPokok || 0).toLocaleString('id-ID');
-      document.getElementById('mCatatanSekretaris').innerText = selectedItem.catatanSekretaris;
+      document.getElementById('inputBuktiTransfer').value = '';
+      document.getElementById('inputCatatanDirektur').value = '';
+
+      if (selectedItem.tipePengajuan === 'CICILAN_LANJUTAN') {
+        document.getElementById('modalJudul').innerText = 'Transfer Pencairan Cicilan';
+        document.getElementById('boxCicilanInfo').style.display = 'block';
+        document.getElementById('boxDealInfo').style.display = 'none';
+        document.getElementById('boxCatatanSekretaris').style.display = 'none';
+        document.getElementById('boxCatatanDirektur').style.display = 'none';
+        document.getElementById('aksiDealBaru').style.display = 'none';
+        document.getElementById('aksiCicilan').style.display = 'inline';
+        document.getElementById('mCicilanKe').innerText = selectedItem.cicilanKe;
+        document.getElementById('mJumlahCicilan').innerText = "Rp " + Math.round(selectedItem.jumlahCicilan || 0).toLocaleString('id-ID');
+        document.getElementById('mTglJatuhTempo').innerText = selectedItem.tglJatuhTempoCicilan || '-';
+      } else {
+        document.getElementById('modalJudul').innerText = 'Executive Review Pengajuan';
+        document.getElementById('boxCicilanInfo').style.display = 'none';
+        document.getElementById('boxDealInfo').style.display = 'grid';
+        document.getElementById('boxCatatanSekretaris').style.display = 'block';
+        document.getElementById('boxCatatanDirektur').style.display = 'block';
+        document.getElementById('aksiDealBaru').style.display = 'inline';
+        document.getElementById('aksiCicilan').style.display = 'none';
+        document.getElementById('mLokasi').innerText = selectedItem.lokasi;
+        document.getElementById('mStatusSewa').innerText = selectedItem.statusSewa;
+        document.getElementById('mHargaPokok').innerText = "Rp " + Math.round(selectedItem.hargaPokok || 0).toLocaleString('id-ID');
+        document.getElementById('mHargaBersih').innerText = "Rp " + Math.round(selectedItem.nilaiGrossUp || selectedItem.hargaPokok || 0).toLocaleString('id-ID');
+        document.getElementById('mCatatanSekretaris').innerText = selectedItem.catatanSekretaris;
+      }
       document.getElementById('modalDirektur').style.display = 'flex';
     }
 
     function tutupModal() { document.getElementById('modalDirektur').style.display = 'none'; }
 
+    // Baca file bukti transfer (kalau dilampirkan) jadi base64, lalu lanjut
+    // ke callback. Dipakai bareng oleh approval deal baru & transfer cicilan.
+    function bacaBuktiTransferLalu(callback) {
+      var fileInput = document.getElementById('inputBuktiTransfer');
+      var file = (fileInput && fileInput.files && fileInput.files.length > 0) ? fileInput.files[0] : null;
+      if (!file) { callback(null, null, null); return; }
+      var reader = new FileReader();
+      reader.onload = function(e) { callback(e.target.result.split(',')[1], file.type, file.name); };
+      reader.readAsDataURL(file);
+    }
+
     function approvalDirektur(keputusan) {
+      var catatan = document.getElementById('inputCatatanDirektur').value || "ACC via Executive Portal";
       tutupModal();
       Swal.fire({
         title: 'Konfirmasi Keputusan', text: 'Proses status ' + keputusan + '?',
@@ -231,45 +286,63 @@
       }).then((res) => {
         if (res.isConfirmed) {
           Swal.fire({ title: 'Menyimpan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-          google.script.run
-            .withSuccessHandler(function(msg) {
-              Swal.fire('Berhasil', msg, 'success');
-              refreshExecutiveData();
-            })
-            .withFailureHandler(function(err) {
-              Swal.fire('Gagal', err.message, 'error');
-            })
-            .verifikasiDirektur(selectedItem.kodeId, keputusan, "ACC via Executive Portal");
+          bacaBuktiTransferLalu(function(buktiData, buktiMime, buktiName) {
+            google.script.run
+              .withSuccessHandler(function(msg) {
+                Swal.fire('Berhasil', msg, 'success');
+                refreshExecutiveData();
+              })
+              .withFailureHandler(function(err) {
+                Swal.fire('Gagal', err.message, 'error');
+              })
+              .verifikasiDirektur(selectedItem.kodeId, keputusan, catatan, buktiData, buktiMime, buktiName);
+          });
+        }
+      });
+    }
+
+    // Konfirmasi transfer utk Cicilan ke-2/3 (deal sudah ACC sejak pass
+    // pertama, jadi cukup tandai transfer + lampirkan bukti).
+    function prosesTransferCicilan() {
+      tutupModal();
+      Swal.fire({
+        title: 'Konfirmasi Transfer Cicilan ke-' + selectedItem.cicilanKe + '?',
+        text: 'Pastikan dana sudah benar-benar ditransfer sebelum konfirmasi.',
+        icon: 'question', showCancelButton: true, confirmButtonColor: '#059669', confirmButtonText: 'Ya, Sudah Ditransfer'
+      }).then((res) => {
+        if (res.isConfirmed) {
+          Swal.fire({ title: 'Menyimpan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          bacaBuktiTransferLalu(function(buktiData, buktiMime, buktiName) {
+            google.script.run
+              .withSuccessHandler(function(msg) {
+                Swal.fire('Berhasil', msg, 'success');
+                refreshExecutiveData();
+              })
+              .withFailureHandler(function(err) {
+                Swal.fire('Gagal', err.message, 'error');
+              })
+              .verifikasiTransferCicilan(selectedItem.kodeId, buktiData, buktiMime, buktiName);
+          });
         }
       });
     }
 
     function loadRiwayatDirektur() {
-      var tbody = document.getElementById('tabelRiwayat');
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Memuat riwayat...</td></tr>';
-
-      google.script.run
-        .withSuccessHandler(function(list) {
-          var tbody = document.getElementById('tabelRiwayat');
-          if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Belum ada arsip.</td></tr>'; return; }
-          var html = '';
-          list.forEach(function(item) {
-            html += '<tr>' +
-              '<td><b>' + item.kodeId + '</b></td>' +
-              '<td>' + item.lokasi + '</td>' +
-              '<td>Rp ' + Math.round(item.nilaiGrossUp).toLocaleString('id-ID') + '</td>' +
-              '<td><b>' + item.statusDirektur + '</b></td>' +
-              '<td>' + item.catatanDirektur + '</td>' +
-              '</tr>';
-          });
-          tbody.innerHTML = html;
-        })
-        .withFailureHandler(function(err) {
-          var tbody = document.getElementById('tabelRiwayat');
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#dc2626; font-weight:bold;">⚠️ Gagal memuat riwayat: ' + err.message + '</td></tr>';
-          Swal.fire({ icon: 'error', title: 'Gagal Memuat Riwayat', text: err.message });
-        })
-        .getRiwayatDirektur();
+      google.script.run.withSuccessHandler(function(list) {
+        var tbody = document.getElementById('tabelRiwayat');
+        if (list.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Belum ada arsip.</td></tr>'; return; }
+        var html = '';
+        list.forEach(function(item) {
+          html += '<tr>' +
+            '<td><b>' + item.kodeId + '</b></td>' +
+            '<td>' + item.lokasi + '</td>' +
+            '<td>Rp ' + Math.round(item.nilaiGrossUp).toLocaleString('id-ID') + '</td>' +
+            '<td><b>' + item.statusDirektur + '</b></td>' +
+            '<td>' + item.catatanDirektur + '</td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+      }).getRiwayatDirektur();
     }
 
     function filterRiwayat() {

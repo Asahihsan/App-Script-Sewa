@@ -17,6 +17,10 @@
       --border-color: #e2e8f0;
     }
 
+    html, body {
+      height: 100%;
+    }
+
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: var(--bg-color);
@@ -29,6 +33,9 @@
 
     .sidebar {
       width: 260px;
+      height: 100%;
+      flex-shrink: 0;
+      box-sizing: border-box;
       background: #0f172a;
       color: white;
       display: flex;
@@ -406,14 +413,18 @@
       var total = 0;
       var html = '';
       list.forEach(function(item, idx) {
-        var net = parseFloat(item.hargaBersih || 0);
+        var isCicilan = item.tipePengajuan === 'CICILAN_LANJUTAN' || item.tipePengajuan === 'CICILAN_1';
+        var net = parseFloat(item.hargaBersih || item.hargaPokok || 0);
         total += net;
+        var labelStatus = isCicilan
+          ? ('<span style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:10px; font-size:10px; font-weight:bold;">CICILAN KE-' + item.cicilanKe + '</span>')
+          : item.statusSewa;
         html += '<tr>' +
           '<td><b>' + item.kodeId + '</b></td>' +
           '<td>' + item.lokasi + '</td>' +
-          '<td>' + item.statusSewa + '</td>' +
+          '<td>' + labelStatus + '</td>' +
           '<td><b style="color:#059669;">Rp ' + Math.round(net).toLocaleString('id-ID') + '</b></td>' +
-          '<td>Rp ' + Math.round(item.nominalPajak || 0).toLocaleString('id-ID') + '</td>' +
+          '<td>' + (item.nominalPajak ? ('Rp ' + Math.round(item.nominalPajak).toLocaleString('id-ID')) : '<i style="color:#94a3b8;">dihitung saat input</i>') + '</td>' +
           '<td><button class="btn-action" onclick="bukaModalKeuangan(' + idx + ')">💸 Cairkan & Input NTPN</button></td>' +
           '</tr>';
       });
@@ -424,14 +435,23 @@
 
     function bukaModalKeuangan(idx) {
       selectedItem = globalKeuData[idx];
-      document.getElementById('mKodeId').innerText = "KODE ID: " + selectedItem.kodeId;
+      var isCicilan = selectedItem.tipePengajuan === 'CICILAN_LANJUTAN' || selectedItem.tipePengajuan === 'CICILAN_1';
+      var labelKodeId = "KODE ID: " + selectedItem.kodeId;
+      if (isCicilan) labelKodeId += "  —  Cicilan ke-" + selectedItem.cicilanKe;
+      document.getElementById('mKodeId').innerText = labelKodeId;
       document.getElementById('mLokasi').innerText = selectedItem.lokasi;
-      document.getElementById('mStatusSewa').innerText = selectedItem.statusSewa;
-      document.getElementById('mHargaBersih').innerText = "Rp " + Math.round(selectedItem.hargaBersih || 0).toLocaleString('id-ID');
-      document.getElementById('mPajak').innerText = "Rp " + Math.round(selectedItem.nominalPajak || 0).toLocaleString('id-ID');
+      document.getElementById('mStatusSewa').innerText = isCicilan ? ('Cicilan ke-' + selectedItem.cicilanKe + ' dari sewa cicilan') : selectedItem.statusSewa;
 
-      // Autofill Nilai Pajak
-      document.getElementById('inputNilaiPajakReal').value = Math.round(selectedItem.nominalPajak || 0).toLocaleString('id-ID');
+      // Untuk cicilan, nilai yang relevan adalah nominal tahap ini saja
+      // (item.hargaPokok = jumlah cicilan tahap aktif), bukan nilai total deal.
+      var nilaiTahap = isCicilan ? (selectedItem.jumlahCicilan || selectedItem.hargaPokok || 0) : (selectedItem.hargaBersih || 0);
+      document.getElementById('mHargaBersih').innerText = "Rp " + Math.round(nilaiTahap).toLocaleString('id-ID');
+      document.getElementById('mPajak').innerText = selectedItem.nominalPajak ? ("Rp " + Math.round(selectedItem.nominalPajak).toLocaleString('id-ID')) : "- (estimasi 10% dari nilai tahap, isi manual di bawah)";
+
+      // Autofill Nilai Pajak -- estimasi 10% kalau belum ada nilai pasti
+      // (konsisten dgn rumus hitungPajak() default dipotong di sumber).
+      var estimasiPajak = selectedItem.nominalPajak || Math.round(nilaiTahap * 0.10);
+      document.getElementById('inputNilaiPajakReal').value = Math.round(estimasiPajak).toLocaleString('id-ID');
       document.getElementById('inputTglBayarPajak').value = new Date().toISOString().split('T')[0];
 
       document.getElementById('modalKeuangan').style.display = 'flex';

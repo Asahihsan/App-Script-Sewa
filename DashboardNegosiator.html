@@ -8,8 +8,10 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     :root { --primary: #2563eb; --bg-color: #f8f9fc; --text-main: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0; }
+    html, body { height: 100%; }
+
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; display: flex; height: 100vh; overflow: hidden; }
-    .sidebar { width: 260px; background: white; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+    .sidebar { width: 260px; height: 100%; flex-shrink: 0; box-sizing: border-box; background: white; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
     .brand { font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
     .menu-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
     .menu-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; transition: all 0.2s; }
@@ -96,14 +98,8 @@
             </div>
 
             <div class="grid-2">
-              <div>
-                <label>NIK Pemilik</label>
-                <input type="text" id="inputNIK" placeholder="16 digit NIK sesuai KTP" maxlength="16" inputmode="numeric">
-              </div>
-              <div>
-                <label>NPWP Pemilik</label>
-                <input type="text" id="inputNPWP" placeholder="Contoh: 12.345.678.9-012.000">
-              </div>
+              <div><label>NIK Pemilik</label><input type="text" id="inputNIK" placeholder="16 digit NIK sesuai KTP" maxlength="16"></div>
+              <div><label>NPWP Pemilik</label><input type="text" id="inputNPWP" placeholder="Contoh: 12.345.678.9-012.000"></div>
             </div>
 
             <div class="grid-2">
@@ -211,6 +207,9 @@
           <!-- DOKUMEN -->
           <div class="card">
             <div class="card-title">📂 Dokumen SPK</div>
+            <a href="https://docs.google.com/document/d/1K-7Relhv317tesNuhjV1qaScR121qtTNtTymjHrw5w4/edit?usp=drive_link" target="_blank" style="display: block; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; text-decoration: none; color: #1e40af; font-size: 13px; font-weight: 600;">
+              📝 Gunakan Template SPK Resmi (klik untuk buka)
+            </a>
             <div class="upload-area" onclick="document.getElementById('uploadSPK').click()">
               <span style="font-size: 30px;">📄</span>
               <p style="margin: 5px 0; font-weight: bold; color: var(--primary);">Klik untuk Unggah Draft SPK (PDF/Word)</p>
@@ -530,11 +529,7 @@
     }
 
     function loadRiwayat() {
-      var tbody = document.getElementById('tabelRiwayat');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Memuat data... ⏳</td></tr>';
-
-      google.script.run
-        .withSuccessHandler(function(list) {
+      google.script.run.withSuccessHandler(function(list) {
         var tbody = document.getElementById('tabelRiwayat');
         if(!tbody) return;
         if(list.length === 0) {
@@ -560,26 +555,35 @@
             statusBadge = '<span style="background:#d1fae5; color:#059669; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:bold;">✅ Dalam Proses</span>';
           }
 
+          // Info progres Cicilan (hanya relevan kalau deal-nya sewa cicilan
+          // dan sudah ACC Direktur -- sebelum itu ikuti statusBadge biasa).
+          var cicilanInfo = '';
+          var btnCicilan = '';
+          if (item.isCicilan && item.statusDirektur === "Disetujui") {
+            if (item.cicilanTerakhirLunas >= item.cicilanTotalTahap) {
+              cicilanInfo = '<br><span style="background:#d1fae5; color:#059669; padding:3px 8px; border-radius:10px; font-size:10px; font-weight:bold; display:inline-block; margin-top:4px;">💰 Cicilan Lunas (' + item.cicilanTotalTahap + '/' + item.cicilanTotalTahap + ')</span>';
+            } else if (item.cicilanAktif > 0) {
+              cicilanInfo = '<br><span style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:10px; font-size:10px; font-weight:bold; display:inline-block; margin-top:4px;">⏳ Proses Cicilan ke-' + item.cicilanAktif + '</span>';
+            } else {
+              cicilanInfo = '<br><span style="background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:10px; font-size:10px; font-weight:bold; display:inline-block; margin-top:4px;">Cicilan Lunas: ' + item.cicilanTerakhirLunas + '/' + item.cicilanTotalTahap + '</span>';
+            }
+            if (item.bisaAjukanCicilanBerikutnya) {
+              btnCicilan = '<button onclick="ajukanCicilanBerikutnya(\'' + item.kodeId + '\')" style="background:#0284c7; color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer; font-weight:bold; margin-right:5px;">💸 Ajukan Cicilan ke-' + (item.cicilanTerakhirLunas + 1) + '</button>';
+            }
+          }
+
           html += '<tr>' +
             '<td><b>' + item.kodeId + '</b></td>' +
             '<td>' + item.lokasi + '</td>' +
             '<td>' + item.statusSewa + '</td>' +
             '<td>Rp ' + Math.round(item.hargaBaru || 0).toLocaleString('id-ID') + '</td>' +
-            '<td>' + statusBadge + '</td>' +
+            '<td>' + statusBadge + cicilanInfo + '</td>' +
             '<td><span style="font-size:12px; color:#475569;">' + (item.catatanMcx || "-") + '</span></td>' +
-            '<td>' + btnEdit + '<button onclick="batalAjuan(\'' + item.kodeId + '\')" style="background:#ef4444; color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer; font-weight:bold;">🗑️ Hapus</button></td>' +
+            '<td>' + btnCicilan + btnEdit + '<button onclick="batalAjuan(\'' + item.kodeId + '\')" style="background:#ef4444; color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer; font-weight:bold;">🗑️ Hapus</button></td>' +
             '</tr>';
         });
         tbody.innerHTML = html;
-        })
-        .withFailureHandler(function(err) {
-          var tbody = document.getElementById('tabelRiwayat');
-          if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#dc2626; font-weight:bold;">⚠️ Gagal memuat riwayat: ' + err.message + '</td></tr>';
-          }
-          Swal.fire({ icon: 'error', title: 'Gagal Memuat Riwayat', text: err.message });
-        })
-        .getRiwayatPengajuan();
+      }).getRiwayatPengajuan();
     }
 
     // FIX LENGKAP: POPULASI SEMUA ELEMEN SAAT EDIT DRAF / REVISI
@@ -647,6 +651,33 @@
         switchTab('form');
         Swal.close();
       }).getDetailPengajuan(kodeId);
+    }
+
+    // Buka siklus pencairan Cicilan berikutnya (2 atau 3). Tidak perlu isi
+    // form lagi -- jadwal & nominalnya sudah diisi lengkap sejak awal.
+    // Begitu diajukan, langsung masuk antrean Direktur (lewati MCX/Sekretaris).
+    function ajukanCicilanBerikutnya(kodeId) {
+      Swal.fire({
+        title: 'Ajukan Pencairan Cicilan Berikutnya?',
+        text: "Pengajuan ini akan langsung masuk ke antrean Direktur untuk transfer (tidak perlu verifikasi ulang MCX/Sekretaris).",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0284c7',
+        confirmButtonText: 'Ya, Ajukan'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          Swal.fire({ title: 'Mengajukan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          google.script.run
+            .withSuccessHandler(function(msg) {
+              Swal.fire('Berhasil', msg, 'success');
+              loadRiwayat();
+            })
+            .withFailureHandler(function(err) {
+              Swal.fire('Gagal', err.message, 'error');
+            })
+            .ajukanPencairanCicilan(kodeId);
+        }
+      });
     }
 
     function batalAjuan(kodeId) {

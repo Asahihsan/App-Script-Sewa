@@ -8,8 +8,10 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     :root { --primary: #0f172a; --accent: #2563eb; --bg-color: #f8fafc; --border-color: #e2e8f0; }
+    html, body { height: 100%; }
+
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); margin: 0; display: flex; height: 100vh; overflow: hidden; }
-    .sidebar { width: 260px; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+    .sidebar { width: 260px; height: 100%; flex-shrink: 0; box-sizing: border-box; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
     .brand { font-size: 18px; font-weight: bold; color: #38bdf8; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
     .menu-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; font-weight: 500; color: #94a3b8; }
     .menu-item.active { background-color: #1e293b; color: white; }
